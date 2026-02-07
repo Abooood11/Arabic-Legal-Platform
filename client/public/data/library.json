@@ -1,0 +1,33 @@
+[
+  {
+    "id": "civil_transactions_sa",
+    "title_ar": "نظام المعاملات المدنية",
+    "jurisdiction_ar": "المملكة العربية السعودية",
+    "doc_type": "official_text",
+    "category": "law",
+    "primary_source_id": "experts_commission",
+    "links": [
+      {
+        "source_id": "experts_commission",
+        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/f6412d26-6f3a-4712-9e6a-b00600d81512/1",
+        "label_ar": "النص الرسمي"
+      }
+    ],
+    "notes_ar": "صدر بالمرسوم الملكي رقم (م/191) وتاريخ 29/11/1444هـ"
+  },
+  {
+    "id": "sharia_procedures",
+    "title_ar": "نظام المرافعات الشرعية",
+    "jurisdiction_ar": "المملكة العربية السعودية",
+    "doc_type": "official_text",
+    "category": "law",
+    "primary_source_id": "experts_commission",
+    "links": [
+      {
+        "source_id": "experts_commission",
+        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/f773a4d8-1c4b-4a5e-8e8e-a4b500d81512/1",
+        "label_ar": "النص الرسمي"
+      }
+    ]
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "experts_commission",
+    "name_ar": "هيئة الخبراء بمجلس الوزراء",
+    "type": "official",
+    "base_url": "https://laws.boe.gov.sa"
+  },
+  {
+    "id": "umm_al_qura",
+    "name_ar": "جريدة أم القرى",
+    "type": "legal-gazette",
+    "base_url": "https://uqn.gov.sa"
+  },
+  {
+    "id": "nca",
+    "name_ar": "المركز الوطني للوثائق والمحفوظات",
+    "type": "archive",
+    "base_url": "https://nca.gov.sa"
+  }
+]
