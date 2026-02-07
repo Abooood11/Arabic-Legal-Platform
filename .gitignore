@@ -5,3 +5,4 @@ dist/
 .DS_Store
 rest-express@1.0.0
 set
+*.csv
