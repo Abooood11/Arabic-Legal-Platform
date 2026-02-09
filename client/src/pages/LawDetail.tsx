@@ -1,3 +1,4 @@
+// Onboarding: see /docs/onboarding (VISION, DOMAIN, ARCHITECTURE, DATA_CONTRACTS, DEBUG_PLAYBOOK)
 import { useLaw, useLawSearch } from "@/hooks/use-data";
 import { Link, useRoute } from "wouter";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -113,43 +114,55 @@ function PreambleSection({ title, text }: PreambleSectionProps) {
 
   if (!text) return null;
 
-  // Identify the header (first line or line containing keywords)
   const lines = text.split('\n');
-  const headerKeywords = ["مرسوم ملكي", "قرار مجلس الوزراء", "رقم ("];
-  let headerIndex = -1;
-  
-  for (let i = 0; i < Math.min(lines.length, 3); i++) {
-    if (headerKeywords.some(kw => lines[i].includes(kw))) {
-      headerIndex = i;
-      break;
-    }
-  }
 
-  // Helper to parse line for existing markers
-  const getLineInfo = (line: string) => {
-    const trimmed = line.trim();
-    const mainHeadingMatch = trimmed.match(/^(أولاً|ثانياً|ثالثاً|رابعاً|خامساً|سادساً|سابعاً|ثامناً|تاسعاً|عاشراً)([:\s].*)?$/);
-    
-    // Support Arabic letters (أ-، ب-) or digits (1-، ١-) as provided in source
-    const markerMatch = trimmed.match(/^(([أ-ي]\s*[-.])|(\d+\s*[-.])|([\u0660-\u0669]+\s*[-.])|([-•·*–]))\s+(.*)$/);
-    
-    return {
-      trimmed,
-      isMainHeading: !!mainHeadingMatch,
-      marker: markerMatch ? markerMatch[1] : null,
-      content: markerMatch ? markerMatch[6] : trimmed
-    };
+  // Classify each line for proper formatting
+  const classifyLine = (line: string, idx: number) => {
+    const t = line.trim();
+    if (!t) return 'empty';
+
+    // Basmala
+    if (t === "بسم الله الرحمن الرحيم") return 'basmala';
+
+    // Royal decree / cabinet decision header line — must START with the keyword
+    // (not "وبعد الاطلاع على قرار مجلس الوزراء..." which is a clause)
+    if (/^(مرسوم ملكي|أمر ملكي|أمر سامي|قرار مجلس الوزراء)\s.*رقم/.test(t)) return 'decree-header';
+
+    // Opening dignitary lines (بعون الله، نحن [الملك]، ملك/نائب ملك)
+    if (t === "بعون الله تعالى" || t === "بعون الله") return 'dignitary';
+    if (/^نحن\s/.test(t) && t.length < 60) return 'dignitary';
+    if (/^(ملك|نائب ملك|ولي العهد)/.test(t) && t.length < 60) return 'dignitary';
+    if (/^باسم خادم الحرمين/.test(t)) return 'dignitary';
+
+    // "رسمنا بما هو آت" / "أمرنا بما هو آت"
+    if (/^(رسمنا|أمرنا)\s+بما\s+هو\s+آت/.test(t)) return 'pronouncement';
+
+    // Ordinal markers (أولاً، ثانياً...)
+    if (/^(أولا|ثانيا|ثالثا|رابعا|خامسا|سادسا|سابعا|ثامنا|تاسعا|عاشرا)/i.test(t.replace(/ً/g, ''))) return 'ordinal-item';
+
+    // Signature / king name lines
+    if (/(التوقيع|التوقيـع)/.test(t)) return 'signature-label';
+    const kingNames = ["فهد بن عبد العزيز", "عبد الله بن عبد العزيز", "عبدالله بن عبدالعزيز",
+      "سلمان بن عبد العزيز", "سلمان بن عبدالعزيز", "نايف بن عبد العزيز", "نايف بن عبدالعزيز",
+      "فيصل بن عبد العزيز", "خالد بن عبد العزيز"];
+    if (kingNames.some(n => t.includes(n)) && t.length < 60) return 'signature-name';
+
+    // Regular clauses
+    return 'clause';
   };
 
-  let currentParentIsMain = false;
+  const classified = lines.map((line, idx) => ({
+    text: line.trim(),
+    type: classifyLine(line, idx)
+  }));
 
   return (
     <div className="container max-w-5xl mx-auto px-4 mt-4">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-300 shadow-sm ${
-          isOpen 
-            ? "bg-primary/5 border-primary/30 text-primary" 
+          isOpen
+            ? "bg-primary/5 border-primary/30 text-primary"
             : "bg-white border-slate-200 text-slate-700 hover:border-primary/20 hover:bg-slate-50"
         }`}
       >
@@ -162,85 +175,92 @@ function PreambleSection({ title, text }: PreambleSectionProps) {
         <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      <div 
+      <div
         className={`overflow-hidden transition-all duration-300 ease-in-out ${
           isOpen ? "max-h-[8000px] opacity-100 mt-3" : "max-h-0 opacity-0"
         }`}
       >
         <div className="bg-white border border-primary/10 rounded-xl p-8 shadow-sm">
-          <div className="text-sm leading-relaxed text-foreground space-y-4 preamble-content" style={{ direction: 'rtl' }}>
-            {lines.map((line: string, idx: number) => {
-              const info = getLineInfo(line);
-              
-              if (info.trimmed === '') return <div key={idx} className="h-2" />;
-              
-              const isMainHeader = idx === headerIndex;
-              const isBasmala = info.trimmed === "بسم الله الرحمن الرحيم";
-              const isSignature = info.trimmed.includes("سلمان بن عبدالعزيز آل سعود") || 
-                                (info.trimmed.includes("نايف بن عبدالعزيز") && info.trimmed.length < 50) ||
-                                (info.trimmed.includes("عبدالله بن عبدالعزيز") && info.trimmed.length < 50);
+          <div className="text-base leading-relaxed text-foreground min-w-0" style={{ direction: 'rtl' }}>
+            {classified.map((item, idx) => {
+              const normalized = toHindiNumerals(normalizeArabicDate(item.text));
 
-              if (info.isMainHeading) {
-                currentParentIsMain = true;
-              } else if (isMainHeader || isBasmala || isSignature) {
-                currentParentIsMain = false;
-              }
+              if (item.type === 'empty') return <div key={idx} className="h-3" />;
 
-              // Apply normalization and numeral conversion
-              const normalizedContent = toHindiNumerals(normalizeArabicDate(info.content));
-              const normalizedMarker = info.marker ? toHindiNumerals(info.marker) : null;
-              
-              if (isBasmala) {
+              if (item.type === 'basmala') {
                 return (
-                  <div key={idx} className="text-center font-bold text-lg text-foreground my-4">
-                    {info.trimmed}
+                  <div key={idx} className="text-center font-bold text-lg mb-6">
+                    {item.text}
                   </div>
                 );
               }
 
-              if (isSignature) {
+              if (item.type === 'decree-header') {
                 return (
-                  <div 
-                    key={idx} 
-                    className="text-left font-bold text-base mt-8 mb-4 pl-4"
-                    dangerouslySetInnerHTML={{ __html: toHindiNumerals(normalizeArabicDate(info.trimmed)) }}
+                  <div
+                    key={idx}
+                    className="text-center font-bold text-lg text-primary mb-6 leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: normalized }}
                   />
                 );
               }
 
-              if (isMainHeader) {
+              if (item.type === 'dignitary') {
                 return (
-                  <div 
-                    key={idx} 
-                    className="text-center font-bold text-lg text-primary my-6 px-4 leading-normal"
-                    dangerouslySetInnerHTML={{ __html: toHindiNumerals(normalizeArabicDate(info.trimmed)) }}
+                  <div
+                    key={idx}
+                    className="text-center font-bold text-base mb-1 leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: normalized }}
                   />
                 );
               }
 
-              if (info.isMainHeading) {
+              if (item.type === 'pronouncement') {
                 return (
-                  <p 
-                    key={idx} 
-                    className="font-bold text-primary mt-8 mb-4 border-b border-primary/10 pb-2 text-base"
-                    dangerouslySetInnerHTML={{ __html: toHindiNumerals(normalizeArabicDate(info.trimmed)) }}
+                  <div
+                    key={idx}
+                    className="text-center font-bold text-primary text-base my-5"
+                    dangerouslySetInnerHTML={{ __html: normalized }}
                   />
                 );
               }
 
+              if (item.type === 'ordinal-item') {
+                // Split into marker and content: "أولاً - الموافقة..." → marker="أولاً" content="الموافقة..."
+                // Normalize tanween position before matching: ثانيًا (tanween before alef) → ثانيا (plain) for regex
+                const textForMatch = item.text.replace(/ً/g, '');
+                const ordMatch = textForMatch.match(/^(أولا|ثانيا|ثالثا|رابعا|خامسا|سادسا|سابعا|ثامنا|تاسعا|عاشرا)\s*[-–:]\s*(.*)/i);
+                const marker = ordMatch ? ordMatch[1] + 'ً:' : '';
+                const content = ordMatch ? ordMatch[2] : item.text;
+                const normalizedContent = toHindiNumerals(normalizeArabicDate(content));
+
+                return (
+                  <div key={idx} className="flex gap-1.5 my-3 leading-relaxed items-start">
+                    {marker && <div className="font-bold text-primary shrink-0">{marker}</div>}
+                    <div className="flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: normalizedContent }} />
+                  </div>
+                );
+              }
+
+              if (item.type === 'signature-label') {
+                return <div key={idx} className="h-4" />;
+              }
+
+              if (item.type === 'signature-name') {
+                return (
+                  <div key={idx} className="text-left font-bold text-base mt-6 mb-2 pl-4" dir="rtl">
+                    <span dangerouslySetInnerHTML={{ __html: normalized }} />
+                  </div>
+                );
+              }
+
+              // Regular clause
               return (
-                <div 
-                  key={idx} 
-                  className={`
-                    flex gap-2 mb-2 leading-relaxed text-justify
-                    ${currentParentIsMain ? 'pr-6' : ''}
-                  `}
-                >
-                  {normalizedMarker && (
-                    <span className="font-bold text-primary shrink-0 min-w-[1.5rem]">{normalizedMarker}</span>
-                  )}
-                  <span dangerouslySetInnerHTML={{ __html: normalizedContent }} />
-                </div>
+                <div
+                  key={idx}
+                  className="my-2 leading-relaxed text-justify"
+                  dangerouslySetInnerHTML={{ __html: normalized }}
+                />
               );
             })}
           </div>
@@ -316,9 +336,9 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
         <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      <div 
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          isOpen ? "max-h-[12000px] opacity-100 mt-3" : "max-h-0 opacity-0"
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          isOpen ? "max-h-[12000px] opacity-100 mt-3" : "max-h-0 opacity-0 overflow-hidden"
         }`}
       >
         <div className="bg-white border border-primary/10 rounded-xl p-8 shadow-sm" style={{ direction: 'rtl' }}>
@@ -362,30 +382,30 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
             {royalDecree.articles.map((article, idx) => (
               <div key={idx} className="space-y-3">
                 {/* Main article marker (أولاً، ثانياً، etc.) */}
-                <div className="flex gap-2">
-                  <span className="font-bold text-primary whitespace-nowrap">{article.marker}:</span>
-                  <span className="text-foreground leading-relaxed">{toHindiNumerals(article.text)}</span>
+                <div className="flex gap-1.5 items-start">
+                  <div className="font-bold text-primary whitespace-nowrap shrink-0">{article.marker}:</div>
+                  <div className="text-foreground leading-relaxed flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{toHindiNumerals(article.text)}</div>
                 </div>
-                
+
                 {/* Sub-items (1-, 2-, etc.) */}
                 {article.items && article.items.length > 0 && (
                   <div className="pr-6 space-y-3">
                     {article.items.map((item, itemIdx) => (
                       <div key={itemIdx} className="space-y-2">
-                        <div className="flex gap-2">
-                          <span className="font-semibold text-emerald-600 whitespace-nowrap">{toHindiNumerals(item.marker)}</span>
-                          <span className="text-foreground leading-relaxed">{toHindiNumerals(item.text)}</span>
+                        <div className="flex gap-1.5 items-start">
+                          <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{toHindiNumerals(item.marker)}</div>
+                          <div className="text-foreground leading-relaxed flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{toHindiNumerals(item.text)}</div>
                         </div>
-                        
+
                         {/* Sub-sub-items (أ-, ب-, etc.) */}
                         {item.sub_items && item.sub_items.length > 0 && (
                           <div className="pr-6 space-y-2">
                             {item.sub_items.map((subItem, subIdx) => (
-                              <div key={subIdx} className="flex gap-2">
+                              <div key={subIdx} className="flex gap-1.5 items-start">
                                 {subItem.marker && (
-                                  <span className="font-semibold text-emerald-600 whitespace-nowrap">{subItem.marker}</span>
+                                  <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{subItem.marker}</div>
                                 )}
-                                <span className="text-foreground leading-relaxed text-sm">{toHindiNumerals(subItem.text)}</span>
+                                <div className="text-foreground leading-relaxed text-sm flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{toHindiNumerals(subItem.text)}</div>
                               </div>
                             ))}
                           </div>
@@ -436,26 +456,26 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
                 <div className="space-y-6 pr-4">
                   {cabinetDecision.provisions.map((provision: any, idx: number) => (
                     <div key={idx} className="space-y-3">
-                      <div className="flex gap-2">
-                        <span className="font-bold text-primary whitespace-nowrap">{provision.marker}:</span>
-                        <span className="text-foreground leading-relaxed">{provision.text}</span>
+                      <div className="flex gap-1.5 items-start">
+                        <div className="font-bold text-primary whitespace-nowrap shrink-0">{provision.marker}:</div>
+                        <div className="text-foreground leading-relaxed flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{provision.text}</div>
                       </div>
                       {provision.items && provision.items.length > 0 && (
                         <div className="pr-6 space-y-3">
                           {provision.items.map((item: any, itemIdx: number) => (
                             <div key={itemIdx} className="space-y-2">
-                              <div className="flex gap-2">
-                                <span className="font-semibold text-emerald-600 whitespace-nowrap">{item.marker}</span>
-                                <span className="text-foreground leading-relaxed">{item.text}</span>
+                              <div className="flex gap-1.5 items-start">
+                                <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{item.marker}</div>
+                                <div className="text-foreground leading-relaxed flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{item.text}</div>
                               </div>
                               {item.sub_items && item.sub_items.length > 0 && (
                                 <div className="pr-6 space-y-2">
                                   {item.sub_items.map((subItem: any, subIdx: number) => (
-                                    <div key={subIdx} className="flex gap-2">
+                                    <div key={subIdx} className="flex gap-1.5 items-start">
                                       {subItem.marker && (
-                                        <span className="font-semibold text-emerald-600 whitespace-nowrap">{subItem.marker}</span>
+                                        <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{subItem.marker}</div>
                                       )}
-                                      <span className="text-foreground leading-relaxed text-sm">{subItem.text}</span>
+                                      <div className="text-foreground leading-relaxed text-sm flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{subItem.text}</div>
                                     </div>
                                   ))}
                                 </div>
@@ -759,16 +779,46 @@ export default function LawDetail() {
         <>
           {/* Use structured component if royal_decree has full structured data (header field), otherwise fall back to text */}
           {(law as any).royal_decree?.header ? (
-            <StructuredRoyalDecreeSection 
+            <StructuredRoyalDecreeSection
               preamble={(law as any).preamble as PreambleData}
               royalDecree={(law as any).royal_decree as RoyalDecreeData}
               cabinetDecision={(law as any).cabinet_decision as CabinetDecisionData}
             />
           ) : (
-            <>
-              <PreambleSection title="المرسوم الملكي" text={law.preamble_text} />
-              <PreambleSection title="قرار مجلس الوزراء" text={law.cabinet_decision_text} />
-            </>
+            (() => {
+              // Dynamically detect instrument types from issuing_authority field.
+              // Legal documents span 100+ years with no fixed order or structure:
+              //   مرسوم ملكي (Royal Decree), أمر ملكي (Royal Order),
+              //   قرار مجلس الوزراء (Cabinet Decision), أمر سامي (Royal Directive)
+              const issuingAuth = (law as any).issuing_authority || '';
+              const rdText = law.preamble_text || (law as any).royal_decree?.text;
+              const cdText = law.cabinet_decision_text;
+
+              // Detect the primary instrument type for the royal_decree.text field
+              let primaryTitle = 'المرسوم الملكي'; // default
+              if (issuingAuth.includes('أمر ملكي')) {
+                primaryTitle = 'الأمر الملكي';
+              } else if (issuingAuth.includes('أمر سامي')) {
+                primaryTitle = 'الأمر السامي';
+              } else if (issuingAuth.includes('مرسوم ملكي')) {
+                primaryTitle = 'المرسوم الملكي';
+              }
+
+              // Determine display order from issuing_authority text:
+              // whichever instrument appears first in issuing_authority is shown first.
+              const rdPos = issuingAuth.search(/مرسوم ملكي|أمر ملكي|أمر سامي/);
+              const cdPos = issuingAuth.search(/قرار مجلس الوزراء/);
+              const showCabinetFirst = cdPos !== -1 && (rdPos === -1 || cdPos < rdPos);
+
+              const primarySection = rdText ? <PreambleSection title={primaryTitle} text={rdText} /> : null;
+              const cabinetSection = cdText ? <PreambleSection title="قرار مجلس الوزراء" text={cdText} /> : null;
+
+              return showCabinetFirst ? (
+                <>{cabinetSection}{primarySection}</>
+              ) : (
+                <>{primarySection}{cabinetSection}</>
+              );
+            })()
           )}
         </>
       )}
@@ -880,7 +930,13 @@ export default function LawDetail() {
                   )}
                   <div className={`article-container group ${isRepealed ? 'border-r-4 border-red-500/50' : ''}`} data-testid={`article-container-${article.number}`}>
                     <div className={`article-number-heading ${isRepealed ? 'text-red-600' : ''}`}>
-                      المادة {toHindiNumerals(article.number_text || article.number.toString())}
+                      {(() => {
+                        const numberText = article.number_text || article.number.toString();
+                        // Ensure "المادة" is always present and not duplicated
+                        const hasAlMadda = numberText.includes('المادة');
+                        const displayText = hasAlMadda ? numberText : `المادة ${numberText}`;
+                        return toHindiNumerals(displayText);
+                      })()}
                       {isRepealed && <span className="mr-2 text-xs font-normal text-red-500">(ملغاة)</span>}
                     </div>
                     
@@ -897,7 +953,7 @@ export default function LawDetail() {
                           
                           if (alphaMarkerMatch) {
                             return (
-                              <p key={idx} className="flex gap-2 pr-4">
+                              <p key={idx} className="flex gap-1.5 pr-4">
                                 <span className="text-primary font-bold shrink-0 min-w-[1.5rem]">{alphaMarkerMatch[1]}-</span>
                                 <span className="text-justify">
                                   <ArticleReferenceText
@@ -912,7 +968,7 @@ export default function LawDetail() {
                           
                           if (numMarkerMatch) {
                             return (
-                              <p key={idx} className="flex gap-2">
+                              <p key={idx} className="flex gap-1.5">
                                 <span className="text-primary font-bold shrink-0 min-w-[1.5rem]">{toHindiNumerals(numMarkerMatch[1])}.</span>
                                 <span className="text-justify">
                                   <ArticleReferenceText
@@ -956,48 +1012,221 @@ export default function LawDetail() {
                       </div>
                     ) : article.paragraphs && article.paragraphs.length > 0 ? (
                       <div className="space-y-2">
-                        {article.paragraphs.map((para: any, idx: number) => {
-                          const marker = (para.marker || "").trim();
-                          const text = (para.text || "").trim();
-                          const level = para.level || 0;
-                          const indentStyle = { marginRight: level === 2 ? '60px' : level === 1 ? '30px' : '0' };
-                          
-                          // Skip paragraphs that are just section titles (duplicates of headers)
-                          if (!marker && (text === currentPart || text === currentChapter || text === currentBranch)) {
-                            return null;
+                        {(() => {
+                          // Normalize & parse paragraphs into a visual AST for rendering.
+                          // See: docs/extraction/boe_formatting_playbook.md (sections B, C, D)
+                          //
+                          // Pre-compute visual levels for smart indentation.
+                          // Arabic ordinal markers (أولاً، ثانياً...) are top-level,
+                          // numeric/letter markers (1-، أ-) under them are sub-level.
+                          const isArabicOrdinalMarker = (m: string) =>
+                            /^(أولا|ثانيا|ثالثا|رابعا|خامسا|سادسا|سابعا|ثامنا|تاسعا|عاشرا|حادي|ثاني|ثالث|رابع|خامس|سادس|سابع|ثامن|تاسع)/i.test(m.replace(/ً/g, ''));
+                          const isNumericMarker = (m: string) => /^\d/.test(m) || /^[٠-٩]/.test(m);
+                          const isLetterMarker = (m: string) => /^[أ-ي]/.test(m) && !isArabicOrdinalMarker(m);
+
+                          // Regex to detect ordinal text that should be a marker
+                          // Matches: "أولاً :" or "أولاً:" or "ثانياً :" etc (with optional text after)
+                          const ordinalTextRegex = /^(أولا[ًً]?|ثانيا[ًً]?|ثالثا[ًً]?|رابعا[ًً]?|خامسا[ًً]?|سادسا[ًً]?|سابعا[ًً]?|ثامنا[ًً]?|تاسعا[ًً]?|عاشرا[ًً]?|حادي[ًً]?\s*عشر|ثاني[ًً]?\s*عشر|ثالث[ًً]?\s*عشر|رابع[ًً]?\s*عشر|خامس[ًً]?\s*عشر)\s*[:：]/;
+
+                          // First pass: normalize paragraphs — promote text-only ordinals to markers
+                          // and handle compound num+letter markers (e.g. "6 - أ : text")
+                          type NormalizedPara = { marker: string; text: string; dataLevel: number; paraType?: string; tableRows?: string[][] };
+                          const normalizedParas: NormalizedPara[] = [];
+
+                          for (const para of article.paragraphs!) {
+                            // Pass through table paragraphs as-is
+                            if ((para as any).type === 'table' && (para as any).table_rows) {
+                              normalizedParas.push({ marker: '', text: '', dataLevel: 0, paraType: 'table', tableRows: (para as any).table_rows });
+                              continue;
+                            }
+
+                            let m = (para.marker || "").trim();
+                            let t = (para.text || "").trim();
+                            const dataLevel = para.level || 0;
+
+                            // If no marker but text looks like "أولاً :" or "أولاً : بعض النص"
+                            if (!m && t) {
+                              const ordMatch = t.match(ordinalTextRegex);
+                              if (ordMatch) {
+                                const matchEnd = t.indexOf(':', ordMatch[0].length - 1);
+                                if (matchEnd !== -1) {
+                                  m = t.slice(0, matchEnd + 1).trim();
+                                  t = t.slice(matchEnd + 1).trim();
+                                } else {
+                                  m = ordMatch[0].trim();
+                                  t = t.slice(ordMatch[0].length).trim();
+                                }
+                              }
+                            }
+
+                            // If no marker, check for patterns
+                            let correctedLevel = dataLevel;
+                            if (!m && t) {
+                              // Standalone letter: "أ : text" or "ب : text" → extract letter as marker
+                              const letterOnly = t.match(/^([أ-ي])\s*[-–:]\s*/);
+                              if (letterOnly && !isArabicOrdinalMarker(letterOnly[1])) {
+                                m = letterOnly[1] + ' :';
+                                t = t.slice(letterOnly[0].length).trim();
+                              }
+                              // Compound: "6 - أ : text" → parent "6-" (empty text) + child "أ" with text
+                              const compoundMatch = !m ? t.match(/^(\d{1,2}|[٠-٩]{1,2})\s*[-–]\s*([أ-ي])\s*[-–:]\s*/) : null;
+                              if (compoundMatch) {
+                                // Push parent numeric item with empty text
+                                normalizedParas.push({ marker: compoundMatch[1] + '-', text: '', dataLevel: correctedLevel });
+                                // Push child letter item one level deeper
+                                normalizedParas.push({ marker: compoundMatch[2] + ' :', text: t.slice(compoundMatch[0].length).trim(), dataLevel: correctedLevel + 1 });
+                                continue;
+                              }
+                              // Simple numeric: "4 الوسائط :" → marker "4-" with text
+                              const numMatch = t.match(/^(\d{1,2}|[٠-٩]{1,2})\s*[-–\s]\s*([\u0600-\u06FF])/);
+                              if (numMatch) {
+                                m = numMatch[1] + '-';
+                                t = t.slice(t.indexOf(numMatch[2])).trim();
+                                correctedLevel = 1;
+                              }
+                            }
+
+                            // If numeric marker and text starts with letter sub-item (أ : text)
+                            // split into parent (numeric, empty text) + child (letter with text)
+                            if (m && isNumericMarker(m) && t) {
+                              const letterStart = t.match(/^([أ-ي])\s*[-–:]\s*/);
+                              if (letterStart) {
+                                normalizedParas.push({ marker: m, text: '', dataLevel: correctedLevel });
+                                normalizedParas.push({ marker: letterStart[1] + ' :', text: t.slice(letterStart[0].length).trim(), dataLevel: correctedLevel + 1 });
+                                continue;
+                              }
+                            }
+
+                            normalizedParas.push({ marker: m, text: t, dataLevel: correctedLevel });
                           }
-                          
-                          // Skip paragraphs that match sub_section or sub_sub_section headers
-                          const fullParagraphText = marker ? `${marker} ${text}` : text;
-                          if (currentSubSection && fullParagraphText.trim() === currentSubSection.trim()) {
-                            return null;
+
+                          // Link standalone letter markers (ب، ج…) as children under last numeric parent
+                          // If a letter marker is at same or lower level as the last numeric, bump it deeper
+                          let lastNumericLevel = -1;
+                          for (let i = 0; i < normalizedParas.length; i++) {
+                            const np = normalizedParas[i];
+                            if (np.marker && isNumericMarker(np.marker)) {
+                              lastNumericLevel = np.dataLevel;
+                            } else if (np.marker && isLetterMarker(np.marker) && lastNumericLevel >= 0 && np.dataLevel <= lastNumericLevel) {
+                              np.dataLevel = lastNumericLevel + 1;
+                            }
                           }
-                          if (currentSubSubSection && fullParagraphText.trim() === currentSubSubSection.trim()) {
-                            return null;
+
+                          // Merge split paragraphs that belong together:
+                          // No marker + previous has no marker + previous doesn't end with sentence-ending punctuation
+                          for (let i = normalizedParas.length - 1; i >= 1; i--) {
+                            const p = normalizedParas[i];
+                            const prev = normalizedParas[i - 1];
+                            if (!p.marker && p.text && !p.paraType) {
+                              const isSplitSentence = !prev.marker && !prev.paraType && prev.text && !/[.،؛:。]\s*$/.test(prev.text.trim());
+                              if (isSplitSentence) {
+                                prev.text = prev.text + ' ' + p.text;
+                                normalizedParas.splice(i, 1);
+                              }
+                            }
                           }
-                          
-                          if (marker) {
+
+                          // Check if article has mixed marker types (ordinal + numeric/letter)
+                          const markers = normalizedParas.map(p => p.marker).filter(Boolean);
+                          const hasOrdinals = markers.some((m: string) => isArabicOrdinalMarker(m));
+                          const hasNumeric = markers.some((m: string) => isNumericMarker(m));
+                          const hasMixedLevels = hasOrdinals && hasNumeric;
+
+                          // Compute effective visual level for each paragraph
+                          type VisualPara = { marker: string; text: string; dataLevel: number; visualLevel: number; paraType?: string; tableRows?: string[][] };
+                          const rawVisualParas: VisualPara[] = normalizedParas.map(np => {
+                            if (np.paraType === 'table') {
+                              return { ...np, visualLevel: 0 };
+                            }
+                            let visualLevel = np.dataLevel;
+                            if (hasMixedLevels && np.marker) {
+                              if (isArabicOrdinalMarker(np.marker)) visualLevel = 0;
+                              else if (isNumericMarker(np.marker)) visualLevel = 1;
+                              else if (isLetterMarker(np.marker)) visualLevel = 2;
+                            }
+                            return { marker: np.marker, text: np.text, dataLevel: np.dataLevel, visualLevel };
+                          });
+
+                          // Normalize levels: shift so the minimum marker level becomes 0
+                          const markerLevels = rawVisualParas.filter(p => p.marker).map(p => p.visualLevel);
+                          const minLevel = markerLevels.length > 0 ? Math.min(...markerLevels) : 0;
+                          const visualParas = rawVisualParas.map(p => ({
+                            ...p,
+                            visualLevel: p.marker ? p.visualLevel - minLevel : p.visualLevel
+                          }));
+
+                          return visualParas.map((vp, idx) => {
+                            const { marker, text, visualLevel } = vp;
+
+                            // Render table paragraphs
+                            if (vp.paraType === 'table' && vp.tableRows) {
+                              return (
+                                <div key={idx} className="my-3 overflow-x-auto">
+                                  <table className="w-full border-collapse text-sm" style={{ direction: 'rtl' }}>
+                                    <tbody>
+                                      {vp.tableRows.map((row: string[], ri: number) => (
+                                        <tr key={ri} className={ri % 2 === 0 ? 'bg-amber-50/40' : 'bg-white'}>
+                                          {row.map((cell: string, ci: number) => (
+                                            <td key={ci} className="border border-slate-200 px-4 py-2.5 text-right">
+                                              {toHindiNumerals(cell)}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              );
+                            }
+
+                            // Skip paragraphs that are just section titles (duplicates of headers)
+                            if (!marker && (text === currentPart || text === currentChapter || text === currentBranch)) {
+                              return null;
+                            }
+                            const fullParagraphText = marker ? `${marker} ${text}` : text;
+                            if (currentSubSection && fullParagraphText.trim() === currentSubSection.trim()) {
+                              return null;
+                            }
+                            if (currentSubSubSection && fullParagraphText.trim() === currentSubSubSection.trim()) {
+                              return null;
+                            }
+
+                            if (marker) {
+                              return (
+                                <NumberedItem key={idx} marker={marker} level={visualLevel}>
+                                  <ArticleReferenceText
+                                    text={text}
+                                    articles={law.articles}
+                                    currentArticleNumber={article.number}
+                                  />
+                                </NumberedItem>
+                              );
+                            }
+
+                            // Continuation paragraph without marker: align with text of previous marker
+                            let prevMarkerLevel = -1;
+                            if (idx > 0) {
+                              for (let pi = idx - 1; pi >= 0; pi--) {
+                                if (visualParas[pi].marker) {
+                                  prevMarkerLevel = visualParas[pi].visualLevel;
+                                  break;
+                                }
+                              }
+                            }
+                            // indent = marker's own indent + offset to clear the marker text
+                            const contIndent = prevMarkerLevel >= 2 ? 88 : prevMarkerLevel >= 1 ? 58 : prevMarkerLevel === 0 ? 28 : 0;
+
                             return (
-                              <NumberedItem key={idx} marker={marker} level={level}>
+                              <div key={idx} style={{ marginRight: `${contIndent}px`, whiteSpace: 'pre-wrap' }}>
                                 <ArticleReferenceText
                                   text={text}
                                   articles={law.articles}
                                   currentArticleNumber={article.number}
                                 />
-                              </NumberedItem>
+                              </div>
                             );
-                          }
-                          
-                          return (
-                            <div key={idx} style={{ marginRight: level === 2 ? '60px' : level === 1 ? '30px' : '0', whiteSpace: 'pre-wrap' }}>
-                              <ArticleReferenceText
-                                text={text}
-                                articles={law.articles}
-                                currentArticleNumber={article.number}
-                              />
-                            </div>
-                          );
-                        })}
+                          });
+                        })()}
                       </div>
                     ) : (
                       <ArticleReferenceText
@@ -1007,6 +1236,124 @@ export default function LawDetail() {
                       />
                     )}
                       </div>
+
+                      {/* Amendments (التعديلات) - For BOE laws */}
+                      {(article as any).amendments && (article as any).amendments.length > 0 && (
+                        <div className="mt-4 border-r-4 border-amber-400/40 bg-amber-50/30 rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                            <span className="font-bold text-amber-800">مادة معدلة</span>
+                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-amber-600 border-amber-300 bg-amber-50">
+                              {(article as any).amendments.length} تعديل
+                            </Badge>
+                          </div>
+                          <div className="space-y-3">
+                            {(article as any).amendments.map((amendment: any, idx: number) => (
+                              <div key={idx} className="bg-white rounded-md p-3 border border-amber-200/50">
+                                {amendment.decree && (
+                                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                                    المرسوم: {toHindiNumerals(amendment.decree)}
+                                    {amendment.date && <span className="mr-2">• التاريخ: {toHindiNumerals(amendment.date)}</span>}
+                                  </div>
+                                )}
+                                {/* Render amendment content using content_parts (preserves original table position) */}
+                                {(() => {
+                                  const parts: any[] = amendment.content_parts || [];
+                                  const markerPattern = /^[\(]?([أ-ي]|جـ)[\)]?\s*[-–—.]\s*/;
+                                  const numMarkerPattern = /^[\(]?([0-9]+|[٠-٩]+)[\)]?\s*[-–—.]\s*/;
+
+                                  // If no content_parts, fall back to plain description
+                                  if (parts.length === 0 && amendment.description) {
+                                    return (
+                                      <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap" style={{ direction: 'rtl' }}>
+                                        {amendment.description}
+                                      </div>
+                                    );
+                                  }
+
+                                  // Track whether previous text part had a marker (for indenting tables)
+                                  let lastLineHadMarker = false;
+
+                                  return (
+                                    <div>
+                                      {parts.map((part: any, pi: number) => {
+                                        if (part.type === 'table' && part.table_rows) {
+                                          // Render table — indent if it follows a marked line
+                                          return (
+                                            <div key={`part-${pi}`} className="overflow-x-auto my-2" style={lastLineHadMarker ? { marginRight: '40px' } : {}}>
+                                              <table className="w-full border-collapse text-sm" style={{ direction: 'rtl' }}>
+                                                <tbody>
+                                                  {part.table_rows.map((row: string[], ri: number) => (
+                                                    <tr key={ri} className={ri % 2 === 0 ? 'bg-amber-50/40' : 'bg-white'}>
+                                                      {row.map((cell: string, ci: number) => (
+                                                        <td key={ci} className="border border-amber-200 px-4 py-2 text-right">
+                                                          {toHindiNumerals(cell)}
+                                                        </td>
+                                                      ))}
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          );
+                                        }
+
+                                        // Text part — split into lines and render with markers
+                                        const textLines = (part.text || '').split('\n').filter((l: string) => l.trim());
+                                        lastLineHadMarker = false;
+
+                                        return (
+                                          <div key={`part-${pi}`}>
+                                            {textLines.map((line: string, li: number) => {
+                                              const trimmed = line.trim();
+                                              const letterMatch = trimmed.match(markerPattern);
+                                              const numMatch = trimmed.match(numMarkerPattern);
+
+                                              if (letterMatch) {
+                                                lastLineHadMarker = true;
+                                                return (
+                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-slate-700" style={{ direction: 'rtl', marginRight: '16px' }}>
+                                                    <span className="font-bold text-primary shrink-0">{letterMatch[1]}-</span>
+                                                    <span className="leading-relaxed">{toHindiNumerals(trimmed.slice(letterMatch[0].length))}</span>
+                                                  </div>
+                                                );
+                                              }
+                                              if (numMatch) {
+                                                lastLineHadMarker = true;
+                                                return (
+                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-slate-700" style={{ direction: 'rtl', marginRight: '16px' }}>
+                                                    <span className="font-bold text-primary shrink-0">{toHindiNumerals(numMatch[1])}-</span>
+                                                    <span className="leading-relaxed">{toHindiNumerals(trimmed.slice(numMatch[0].length))}</span>
+                                                  </div>
+                                                );
+                                              }
+
+                                              lastLineHadMarker = false;
+                                              return (
+                                                <div key={li} className="text-sm text-slate-700 leading-relaxed my-1" style={{ direction: 'rtl' }}>
+                                                  {toHindiNumerals(trimmed)}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
+                                {amendment.new_text && (
+                                  <div className="mt-2 pt-2 border-t border-amber-100">
+                                    <div className="text-xs text-amber-600 font-medium mb-1">النص الجديد:</div>
+                                    <div className="text-sm text-slate-600 bg-amber-50 rounded px-2 py-1 whitespace-pre-wrap" style={{ direction: 'rtl' }}>
+                                      {amendment.new_text}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Regulations (اللائحة) - Collapsible with Reference Panel Style */}
                       {article.regulations && article.regulations.length > 0 && (
@@ -1148,9 +1495,9 @@ export default function LawDetail() {
 
                   {/* Comparative Laws Dropdown */}
                   {hasComparative && (
-                    <div 
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        isOpen ? "max-h-[2000px] opacity-100 mt-5" : "max-h-0 opacity-0"
+                    <div
+                      className={`transition-all duration-300 ease-in-out ${
+                        isOpen ? "max-h-[2000px] opacity-100 mt-5" : "max-h-0 opacity-0 overflow-hidden"
                       }`}
                     >
                       <div className="bg-gradient-to-b from-slate-50 to-slate-100/50 border border-slate-200 rounded-xl p-5">
