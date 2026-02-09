@@ -131,6 +131,20 @@
     text-justify: inter-word;
   }
 
+  /* Judgment text styling with kashida justification */
+  .judgment-text {
+    text-align: justify;
+    text-justify: inter-word;
+    text-align-last: start;
+    line-height: 2.2;
+    font-size: 15px;
+    font-family: var(--font-sans);
+    white-space: pre-wrap;
+    color: #1e293b;
+    font-kerning: auto;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
   .law-content-frame {
     @apply max-w-5xl mx-auto my-4 bg-white shadow-sm border border-slate-200 rounded-lg px-8 md:px-12 overflow-visible;
   }
@@ -142,7 +156,7 @@
 
 @layer components {
   .law-content-frame {
-    @apply max-w-5xl mx-auto bg-[#f8f9fa] shadow-sm border border-[#e9ecef] rounded-sm my-4 overflow-hidden;
+    @apply max-w-5xl mx-auto bg-[#f8f9fa] shadow-sm border border-[#e9ecef] rounded-sm my-4 overflow-visible;
   }
 }
 

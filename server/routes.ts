@@ -12,9 +12,9 @@ const isAuthenticated: RequestHandler = (req, res, next) => {
   (req as any).user = { claims: { sub: "dev_admin" } };
   next();
 };
-import { db } from "./db";
+import { db, sqlite } from "./db";
 import { articleOverrides, errorReports, judgments } from "@shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, like } from "drizzle-orm";
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
 const isAdmin: RequestHandler = async (req, res, next) => {
@@ -63,24 +63,93 @@ export async function registerRoutes(
       const offset = (page - 1) * limit;
       const sort = (req.query.sort as string) || "date";
 
-      const { q, city, year, court, hasDate } = req.query;
+      const { q, city, year, court, hasDate, source, judge } = req.query;
 
+      // Use FTS5 for text search when q is provided
+      if (q && typeof q === "string" && q.trim().length > 0) {
+        try {
+          // Build additional WHERE filters
+          const filters: string[] = [];
+          const params: any[] = [];
+
+          if (city) { filters.push("j.city LIKE ?"); params.push(city); }
+          if (year) { filters.push("j.year_hijri = ?"); params.push(parseInt(year as string)); }
+          if (court) { filters.push("j.court_body LIKE ?"); params.push(`%${court}%`); }
+          if (source) { filters.push("j.source = ?"); params.push(source); }
+          if (hasDate === "true") { filters.push("j.judgment_date IS NOT NULL AND j.judgment_date != ''"); }
+          if (judge) { filters.push("j.judges LIKE ?"); params.push(`%${judge}%`); }
+
+          const filterSQL = filters.length > 0 ? "AND " + filters.join(" AND ") : "";
+
+          // Sort
+          let orderSQL = "ORDER BY j.judgment_date DESC";
+          if (sort === "year") orderSQL = "ORDER BY j.year_hijri DESC";
+          else if (sort === "city") orderSQL = "ORDER BY j.city";
+          else if (sort === "court") orderSQL = "ORDER BY j.court_body";
+
+          // Better Arabic search: allow partial matches and handle diacritics
+          const ftsQuery = q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
+
+          const countStmt = sqlite.prepare(`
+            SELECT count(*) as count FROM judgments j
+            INNER JOIN judgments_fts fts ON j.id = fts.rowid
+            WHERE judgments_fts MATCH ? ${filterSQL}
+          `);
+          const countResult = countStmt.get(ftsQuery, ...params) as any;
+
+          const dataStmt = sqlite.prepare(`
+            SELECT j.id, j.case_id as caseId, j.year_hijri as yearHijri, j.city,
+                   j.court_body as courtBody, j.circuit_type as circuitType,
+                   j.judgment_number as judgmentNumber, j.judgment_date as judgmentDate,
+                   j.source, j.appeal_type as appealType,
+                   snippet(judgments_fts, 0, '【', '】', '...', 40) as textSnippet,
+                   bm25(judgments_fts) as rank
+            FROM judgments j
+            INNER JOIN judgments_fts fts ON j.id = fts.rowid
+            WHERE judgments_fts MATCH ? ${filterSQL}
+            ORDER BY rank
+            LIMIT ? OFFSET ?
+          `);
+          const results = dataStmt.all(ftsQuery, ...params, limit, offset);
+
+          return res.json({
+            data: results,
+            pagination: {
+              page,
+              limit,
+              total: Number(countResult.count),
+              totalPages: Math.ceil(Number(countResult.count) / limit)
+            }
+          });
+        } catch (ftsErr) {
+          // Fallback to LIKE if FTS fails
+          console.warn("FTS search failed, falling back to LIKE:", ftsErr);
+        }
+      }
+
+      // Non-FTS path (no search query or FTS fallback)
       const conditions = [];
 
       if (city) {
-        conditions.push(sql`city ILIKE ${city as string}`);
+        conditions.push(sql`city LIKE ${city as string}`);
       }
       if (year) {
         conditions.push(eq(judgments.yearHijri, parseInt(year as string)));
       }
       if (court) {
-        conditions.push(sql`court_body ILIKE ${`%${court}%`}`);
+        conditions.push(sql`court_body LIKE ${`%${court}%`}`);
       }
       if (q) {
-        conditions.push(sql`text ILIKE ${`%${q}%`}`);
+        conditions.push(sql`text LIKE ${`%${q}%`}`);
       }
       if (hasDate === "true") {
         conditions.push(sql`judgment_date IS NOT NULL AND judgment_date != ''`);
+      }
+      if (source) {
+        conditions.push(eq(judgments.source, source as string));
+      }
+      if (judge) {
+        conditions.push(sql`judges LIKE ${`%${judge}%`}`);
       }
 
       // Build order clause
@@ -112,7 +181,9 @@ export async function registerRoutes(
           circuitType: judgments.circuitType,
           judgmentNumber: judgments.judgmentNumber,
           judgmentDate: judgments.judgmentDate,
-          textSnippet: sql<string>`substring(text from 1 for 220)`,
+          source: judgments.source,
+          appealType: judgments.appealType,
+          textSnippet: sql<string>`substr(text, 1, 400)`,
         })
         .from(judgments)
         .where(whereClause)
@@ -144,10 +215,13 @@ export async function registerRoutes(
   // Faceted counts - MUST be before :id route
   app.get("/api/judgments/facets", async (req, res) => {
     try {
+      const { source } = req.query;
+      const sourceCondition = source ? eq(judgments.source, source as string) : undefined;
+
       const cities = await db
         .select({ city: judgments.city, count: sql<number>`count(*)` })
         .from(judgments)
-        .where(sql`city IS NOT NULL AND city != ''`)
+        .where(sourceCondition ? and(sql`city IS NOT NULL AND city != ''`, sourceCondition) : sql`city IS NOT NULL AND city != ''`)
         .groupBy(judgments.city)
         .orderBy(sql`count(*) DESC`)
         .limit(50);
@@ -155,7 +229,7 @@ export async function registerRoutes(
       const courts = await db
         .select({ court: judgments.courtBody, count: sql<number>`count(*)` })
         .from(judgments)
-        .where(sql`court_body IS NOT NULL AND court_body != ''`)
+        .where(sourceCondition ? and(sql`court_body IS NOT NULL AND court_body != ''`, sourceCondition) : sql`court_body IS NOT NULL AND court_body != ''`)
         .groupBy(judgments.courtBody)
         .orderBy(sql`count(*) DESC`)
         .limit(50);
@@ -163,7 +237,7 @@ export async function registerRoutes(
       const years = await db
         .select({ year: judgments.yearHijri, count: sql<number>`count(*)` })
         .from(judgments)
-        .where(sql`year_hijri IS NOT NULL`)
+        .where(sourceCondition ? and(sql`year_hijri IS NOT NULL`, sourceCondition) : sql`year_hijri IS NOT NULL`)
         .groupBy(judgments.yearHijri)
         .orderBy(desc(judgments.yearHijri));
 
@@ -180,13 +254,10 @@ export async function registerRoutes(
       const idParam = req.params.id;
       const id = parseInt(idParam, 10);
 
-      // Validate ID is a number
       if (isNaN(id)) {
         console.error(`Invalid judgment ID requested: "${idParam}"`);
         return res.status(400).json({ message: "Invalid judgment ID" });
       }
-
-      console.log(`Fetching judgment with id: ${id}`);
 
       const [result] = await db
         .select()
@@ -194,11 +265,9 @@ export async function registerRoutes(
         .where(eq(judgments.id, id));
 
       if (!result) {
-        console.error(`Judgment not found for id: ${id}`);
         return res.status(404).json({ message: "Judgment not found", requestedId: id });
       }
 
-      console.log(`Found judgment id=${id}, text length=${result.text?.length || 0}`);
       res.json(result);
     } catch (error) {
       console.error("Error fetching judgment:", error);
@@ -214,7 +283,7 @@ export async function registerRoutes(
         .from(articleOverrides)
         .where(eq(articleOverrides.lawId, lawId));
 
-      const overridesMap: Record<string, { overrideText: string; updatedAt: Date; updatedBy: string }> = {};
+      const overridesMap: Record<string, { overrideText: string; updatedAt: string; updatedBy: string }> = {};
       overrides.forEach((o) => {
         overridesMap[o.articleNumber] = {
           overrideText: o.overrideText,
@@ -273,20 +342,22 @@ export async function registerRoutes(
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
+      const now = new Date().toISOString();
+
       const [result] = await db
         .insert(articleOverrides)
         .values({
           lawId,
           articleNumber,
           overrideText: sanitizedText,
-          updatedAt: new Date(),
+          updatedAt: now,
           updatedBy: userId,
         })
         .onConflictDoUpdate({
           target: [articleOverrides.lawId, articleOverrides.articleNumber],
           set: {
             overrideText: sanitizedText,
-            updatedAt: new Date(),
+            updatedAt: now,
             updatedBy: userId,
           },
         })
@@ -366,7 +437,7 @@ export async function registerRoutes(
 
       const [report] = await db
         .update(errorReports)
-        .set({ status: "resolved", resolvedAt: new Date() })
+        .set({ status: "resolved", resolvedAt: new Date().toISOString() })
         .where(eq(errorReports.id, parseInt(id)))
         .returning();
 

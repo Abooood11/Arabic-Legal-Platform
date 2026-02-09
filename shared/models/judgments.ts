@@ -1,28 +1,28 @@
-import { pgTable, text, serial, integer, varchar, timestamp, index } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
-export const judgments = pgTable(
+export const judgments = sqliteTable(
     "judgments",
     {
-        id: serial("id").primaryKey(),
-        caseId: varchar("case_id").notNull(),
+        id: integer("id").primaryKey({ autoIncrement: true }),
+        caseId: text("case_id").notNull(),
         yearHijri: integer("year_hijri"),
-        city: varchar("city"),
-        courtBody: varchar("court_body"),
-        circuitType: varchar("circuit_type"),
-        judgmentNumber: varchar("judgment_number"),
-        judgmentDate: varchar("judgment_date"), // Keeping as string as dates might be Hijri or varying formats
+        city: text("city"),
+        courtBody: text("court_body"),
+        circuitType: text("circuit_type"),
+        judgmentNumber: text("judgment_number"),
+        judgmentDate: text("judgment_date"),
         text: text("text").notNull(),
-        createdAt: timestamp("created_at").defaultNow().notNull(),
+        source: text("source").notNull().default("sa_judicial"),
+        appealType: text("appeal_type"),
+        judges: text("judges", { mode: "json" }).$type<{ role: string; name: string }[]>(),
+        createdAt: text("created_at").notNull().default("(datetime('now'))"),
     },
     (table) => ({
-        // Indexes for common filters
         cityIdx: index("city_idx").on(table.city),
         yearIdx: index("year_idx").on(table.yearHijri),
         courtBodyIdx: index("court_body_idx").on(table.courtBody),
-        // Full text search index would ideally be:
-        // searchIdx: index("search_idx").using("gin", sql`to_tsvector('arabic', ${table.text})`),
-        // keeping it simple for now, relying on ILIKE or external search if needed later.
+        sourceIdx: index("source_idx").on(table.source),
     })
 );
 
