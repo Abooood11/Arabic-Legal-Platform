@@ -1,0 +1,24 @@
+{
+  "law_id": "53cfe087-dae1-4b95-8dff-a9a700f29f3b",
+  "law_name": "تنظيم المجلس الأعلى لشؤون البترول والمعادن",
+  "title": "تنظيم المجلس الأعلى لشؤون البترول والمعادن",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "law",
+  "primary_source_id": "boe",
+  "status": "ساري",
+  "issue_date_hijri": "1420/01/01",
+  "issue_date_gregorian": "17/04/1999",
+  "publish_date_hijri": "1420/01/01",
+  "publish_date_gregorian": "17/04/1999",
+  "issuing_authority": "أمر ملكي رقم أ/212 بتاريخ 27 / 9 / 1420",
+  "links": [
+    {
+      "source_id": "boe",
+      "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/53cfe087-dae1-4b95-8dff-a9a700f29f3b/1",
+      "label_ar": "النص الرسمي - هيئة الخبراء"
+    }
+  ],
+  "total_articles": 0,
+  "articles": []
+}

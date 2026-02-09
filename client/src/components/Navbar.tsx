@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Scale, Menu, BookOpen, Info, LogOut, User } from "lucide-react";
+import { Scale, Menu, BookOpen, Info, LogOut, User, FileText } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ export function Navbar() {
 
   const links = [
     { href: "/library", label: "المكتبة", icon: BookOpen },
+    { href: "/regulations", label: "اللوائح التنفيذية", icon: FileText },
     { href: "/judgments", label: "الأحكام القضائية", icon: Scale },
     { href: "/about", label: "عن المنصة", icon: Info },
   ];
@@ -37,8 +38,8 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${location === link.href ? "text-primary" : "text-muted-foreground"
-                }`}
+              className={`flex items - center gap - 2 text - sm font - medium transition - colors hover: text - primary ${location === link.href ? "text-primary" : "text-muted-foreground"
+                } `}
             >
               <link.icon className="w-4 h-4" />
               {link.label}
@@ -90,10 +91,10 @@ export function Navbar() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setIsOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location === link.href
+                    className={`flex items - center gap - 3 px - 4 py - 3 rounded - lg text - sm font - medium transition - colors ${location === link.href
                         ? "bg-primary/10 text-primary"
                         : "hover:bg-muted text-muted-foreground"
-                      }`}
+                      } `}
                   >
                     <link.icon className="w-5 h-5" />
                     {link.label}

@@ -27,10 +27,17 @@ export class FileStorage implements IStorage {
 
   async getLaw(id: string): Promise<Law | undefined> {
     try {
+      // Try exact match first
       const data = await fs.readFile(path.join(this.dataDir, "laws", `${id}.json`), "utf-8");
       return JSON.parse(data);
     } catch (e) {
-      return undefined;
+      // Try with _boe suffix for BOE laws
+      try {
+        const data = await fs.readFile(path.join(this.dataDir, "laws", `${id}_boe.json`), "utf-8");
+        return JSON.parse(data);
+      } catch (e2) {
+        return undefined;
+      }
     }
   }
 }

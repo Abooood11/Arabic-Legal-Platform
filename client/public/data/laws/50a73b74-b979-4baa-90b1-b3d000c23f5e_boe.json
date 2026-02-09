@@ -1,0 +1,24 @@
+{
+  "law_id": "50a73b74-b979-4baa-90b1-b3d000c23f5e",
+  "law_name": "التفاصيل",
+  "title": "التفاصيل",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "law",
+  "primary_source_id": "boe",
+  "status": "ساري",
+  "issue_date_hijri": "",
+  "issue_date_gregorian": "",
+  "publish_date_hijri": "",
+  "publish_date_gregorian": "",
+  "issuing_authority": "",
+  "links": [
+    {
+      "source_id": "boe",
+      "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/50a73b74-b979-4baa-90b1-b3d000c23f5e/1",
+      "label_ar": "النص الرسمي - هيئة الخبراء"
+    }
+  ],
+  "total_articles": 0,
+  "articles": []
+}

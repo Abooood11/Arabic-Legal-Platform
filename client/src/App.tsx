@@ -13,6 +13,7 @@ import Library from "@/pages/Library";
 import LawDetail from "@/pages/LawDetail";
 import About from "@/pages/About";
 import ErrorReports from "@/pages/ErrorReports";
+import Regulations from "@/pages/Regulations";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAdmin();
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/judgments" component={Judgments} />
       <Route path="/judgments/:id" component={JudgmentDetail} />
       <Route path="/about" component={About} />
+      <Route path="/regulations" component={Regulations} />
       <Route path="/law/:id" component={LawDetail} />
       <Route path="/admin/reports">{() => <AdminRoute component={ErrorReports} />}</Route>
       <Route component={NotFound} />

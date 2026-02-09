@@ -84,6 +84,7 @@ export const lawSchema = z.object({
   royal_decree: z.any().optional(),
   cabinet_decision: z.any().optional(),
   cabinet_decision_text: z.string().optional(),
+  issuing_authority: z.string().optional(),
   total_articles: z.number().optional(),
   articles: z.array(articleSchema),
   // Backward compatibility fields (optional)

@@ -1,0 +1,22 @@
+[
+    {
+        "id": "sharia_procedures_regulations",
+        "title_ar": "اللائحة التنفيذية لنظام المرافعات الشرعية",
+        "jurisdiction_ar": "المملكة العربية السعودية",
+        "doc_type": "executive_regulation",
+        "category": "regulation",
+        "related_law_id": "sharia_procedures",
+        "related_law_title": "نظام المرافعات الشرعية",
+        "issuing_authority": "المجلس الأعلى للقضاء",
+        "issue_date_hijri": "1436/01/01",
+        "links": [
+            {
+                "source_id": "experts_commission",
+                "url": "https://laws.boe.gov.sa",
+                "label_ar": "النص الرسمي"
+            }
+        ],
+        "description_ar": "اللائحة التنفيذية لنظام المرافعات الشرعية وتفصيل إجراءاته",
+        "status": "active"
+    }
+]
