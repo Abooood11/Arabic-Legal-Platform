@@ -1,0 +1,56 @@
+{
+  "law_id": "uqn_18121",
+  "law_name": "مشروع القواعد المنظمة لتراخيص التأجير على الخارطة",
+  "title": "مشروع القواعد المنظمة لتراخيص التأجير على الخارطة",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "regulation",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1443/01/05",
+  "issue_date_gregorian": "13/08/2021",
+  "publish_date_hijri": "1443/01/05",
+  "publish_date_gregorian": "13/08/2021",
+  "issuing_authority": "لوائح وأنظمة",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=18121",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "“تتمة اللائحة مرفقة نسخة PDF”\nمشروع-القواعد-المنظمة-لتراخيص-التأجير-على-الخارطة\nتنزيل\nتنزيل الملف",
+      "original_text": "“تتمة اللائحة مرفقة نسخة PDF”\nمشروع-القواعد-المنظمة-لتراخيص-التأجير-على-الخارطة\nتنزيل\nتنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "“تتمة اللائحة مرفقة نسخة PDF”",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "مشروع-القواعد-المنظمة-لتراخيص-التأجير-على-الخارطة",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

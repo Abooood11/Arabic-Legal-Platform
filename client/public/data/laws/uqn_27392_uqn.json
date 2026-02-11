@@ -1,0 +1,41 @@
+{
+  "law_id": "uqn_27392",
+  "law_name": "تعديل القوائم الأولى والثانية والثالثة للمواد الكيميائية المقيدة أمنياً",
+  "title": "تعديل القوائم الأولى والثانية والثالثة للمواد الكيميائية المقيدة أمنياً",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "regulation",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1447/03/06",
+  "issue_date_gregorian": "29/08/2025",
+  "publish_date_hijri": "1447/03/06",
+  "publish_date_gregorian": "29/08/2025",
+  "issuing_authority": "لوائح وأنظمة",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=27392",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "تنزيل الملف",
+      "original_text": "تنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

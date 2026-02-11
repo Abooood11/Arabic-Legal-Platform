@@ -1,0 +1,51 @@
+{
+  "law_id": "uqn_19188",
+  "law_name": "لائحة الشهادات التأهيلية البحرية",
+  "title": "لائحة الشهادات التأهيلية البحرية",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "regulation",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1443/08/22",
+  "issue_date_gregorian": "25/03/2022",
+  "publish_date_hijri": "1443/08/22",
+  "publish_date_gregorian": "25/03/2022",
+  "issuing_authority": "لوائح وأنظمة",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=19188",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "\"مرفقة كنسخة PDF\"\nلائحة الشهادات التأهيلية البحرية\nتنزيل الملف",
+      "original_text": "\"مرفقة كنسخة PDF\"\nلائحة الشهادات التأهيلية البحرية\nتنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "\"مرفقة كنسخة PDF\"",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "لائحة الشهادات التأهيلية البحرية",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

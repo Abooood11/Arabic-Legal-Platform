@@ -1,0 +1,41 @@
+{
+  "law_id": "uqn_26677",
+  "law_name": "جدول المخالفات والعقوبات لنظام الخطوط الحديدية",
+  "title": "جدول المخالفات والعقوبات لنظام الخطوط الحديدية",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "regulation",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1446/04/22",
+  "issue_date_gregorian": "25/10/2024",
+  "publish_date_hijri": "1446/04/22",
+  "publish_date_gregorian": "25/10/2024",
+  "issuing_authority": "لوائح وأنظمة",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=26677",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "تنزيل الملف",
+      "original_text": "تنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

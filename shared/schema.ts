@@ -20,7 +20,7 @@ export const libraryItemSchema = z.object({
   primary_source_id: z.string(),
   links: z.array(z.object({
     source_id: z.string(),
-    url: z.string().url(),
+    url: z.string(),
     label_ar: z.string().optional()
   })),
   notes_ar: z.string().optional(),
@@ -116,3 +116,4 @@ export * from "./models/auth";
 export * from "./models/articleOverrides";
 export * from "./models/errorReports";
 export * from "./models/judgments";
+export * from "./models/gazetteIndex";
