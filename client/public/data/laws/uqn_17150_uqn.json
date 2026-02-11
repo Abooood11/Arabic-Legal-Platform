@@ -1,0 +1,41 @@
+{
+  "law_id": "uqn_17150",
+  "law_name": "الموافقة على نظام العمل التطوعي",
+  "title": "الموافقة على نظام العمل التطوعي",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "decision",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1441/06/06",
+  "issue_date_gregorian": "31/01/2020",
+  "publish_date_hijri": "1441/06/06",
+  "publish_date_gregorian": "31/01/2020",
+  "issuing_authority": "قرارات مجلس الوزراء",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=17150",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "تنزيل الملف",
+      "original_text": "تنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

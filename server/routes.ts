@@ -13,7 +13,7 @@ const isAuthenticated: RequestHandler = (req, res, next) => {
   next();
 };
 import { db, sqlite } from "./db";
-import { articleOverrides, errorReports, judgments } from "@shared/schema";
+import { articleOverrides, errorReports, judgments, gazetteIndex } from "@shared/schema";
 import { eq, and, desc, sql, like } from "drizzle-orm";
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
@@ -43,6 +43,8 @@ export async function registerRoutes(
 
   app.get(api.library.list.path, async (req, res) => {
     const library = await storage.getLibrary();
+    // Cache library for 10 minutes in browser (data changes rarely)
+    res.set("Cache-Control", "public, max-age=600");
     res.json(library);
   });
 
@@ -52,6 +54,8 @@ export async function registerRoutes(
     if (!law) {
       return res.status(404).json({ message: "Law not found" });
     }
+    // Cache individual law for 1 hour in browser
+    res.set("Cache-Control", "public, max-age=3600");
     res.json(law);
   });
 
@@ -460,6 +464,142 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting error report:", error);
       res.status(500).json({ message: "Failed to delete error report" });
+    }
+  });
+
+  // ============================================
+  // Gazette Index API  (كشاف أم القرى)
+  // ============================================
+
+  // Faceted counts — MUST be before :id route
+  app.get("/api/gazette/facets", async (req, res) => {
+    try {
+      const categories = await db
+        .select({ category: gazetteIndex.category, count: sql<number>`count(*)` })
+        .from(gazetteIndex)
+        .where(sql`category IS NOT NULL AND category != ''`)
+        .groupBy(gazetteIndex.category)
+        .orderBy(sql`count(*) DESC`);
+
+      const years = await db
+        .select({ year: gazetteIndex.issueYear, count: sql<number>`count(*)` })
+        .from(gazetteIndex)
+        .where(sql`issue_year IS NOT NULL`)
+        .groupBy(gazetteIndex.issueYear)
+        .orderBy(desc(gazetteIndex.issueYear));
+
+      const legislationYears = await db
+        .select({ year: gazetteIndex.legislationYear, count: sql<number>`count(*)` })
+        .from(gazetteIndex)
+        .where(sql`legislation_year IS NOT NULL AND legislation_year != ''`)
+        .groupBy(gazetteIndex.legislationYear)
+        .orderBy(sql`legislation_year DESC`)
+        .limit(100);
+
+      res.json({ categories, years, legislationYears });
+    } catch (error) {
+      console.error("Error fetching gazette facets:", error);
+      res.status(500).json({ message: "Failed to fetch gazette facets" });
+    }
+  });
+
+  // List + Search + Filter
+  app.get("/api/gazette", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const offset = (page - 1) * limit;
+
+      const { q, category, year, legislationYear } = req.query;
+
+      // FTS5 path
+      if (q && typeof q === "string" && q.trim().length > 0) {
+        try {
+          const filters: string[] = [];
+          const params: any[] = [];
+
+          if (category) { filters.push("g.category = ?"); params.push(category); }
+          if (year) { filters.push("g.issue_year = ?"); params.push(parseInt(year as string)); }
+          if (legislationYear) { filters.push("g.legislation_year = ?"); params.push(legislationYear); }
+
+          const filterSQL = filters.length > 0 ? "AND " + filters.join(" AND ") : "";
+          const ftsQuery = q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
+
+          const countStmt = sqlite.prepare(`
+            SELECT count(*) as count FROM gazette_index g
+            INNER JOIN gazette_fts fts ON g.id = fts.rowid
+            WHERE gazette_fts MATCH ? ${filterSQL}
+          `);
+          const countResult = countStmt.get(ftsQuery, ...params) as any;
+
+          const dataStmt = sqlite.prepare(`
+            SELECT g.id, g.issue_year as issueYear, g.issue_number as issueNumber,
+                   g.title, g.legislation_number as legislationNumber,
+                   g.legislation_year as legislationYear, g.category,
+                   snippet(gazette_fts, 0, '【', '】', '...', 40) as titleSnippet,
+                   bm25(gazette_fts) as rank
+            FROM gazette_index g
+            INNER JOIN gazette_fts fts ON g.id = fts.rowid
+            WHERE gazette_fts MATCH ? ${filterSQL}
+            ORDER BY rank
+            LIMIT ? OFFSET ?
+          `);
+          const results = dataStmt.all(ftsQuery, ...params, limit, offset);
+
+          return res.json({
+            data: results,
+            pagination: {
+              page, limit,
+              total: Number(countResult.count),
+              totalPages: Math.ceil(Number(countResult.count) / limit)
+            }
+          });
+        } catch (ftsErr) {
+          console.warn("Gazette FTS failed, falling back to LIKE:", ftsErr);
+        }
+      }
+
+      // Non-FTS path
+      const conditions = [];
+      if (category) conditions.push(eq(gazetteIndex.category, category as string));
+      if (year) conditions.push(eq(gazetteIndex.issueYear, parseInt(year as string)));
+      if (legislationYear) conditions.push(eq(gazetteIndex.legislationYear, legislationYear as string));
+      if (q) conditions.push(sql`title LIKE ${`%${q}%`}`);
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const results = await db
+        .select({
+          id: gazetteIndex.id,
+          issueYear: gazetteIndex.issueYear,
+          issueNumber: gazetteIndex.issueNumber,
+          title: gazetteIndex.title,
+          legislationNumber: gazetteIndex.legislationNumber,
+          legislationYear: gazetteIndex.legislationYear,
+          category: gazetteIndex.category,
+        })
+        .from(gazetteIndex)
+        .where(whereClause)
+        .orderBy(desc(gazetteIndex.issueYear))
+        .limit(limit)
+        .offset(offset);
+
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(gazetteIndex)
+        .where(whereClause);
+
+      res.json({
+        data: results,
+        pagination: {
+          page, limit,
+          total: Number(countResult.count),
+          totalPages: Math.ceil(Number(countResult.count) / limit)
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching gazette:", error);
+      res.status(500).json({ message: "Failed to fetch gazette data" });
     }
   });
 
