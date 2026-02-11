@@ -1,0 +1,12 @@
+node_modules
+dist
+*.log
+*.csv
+data.db-shm
+data.db-wal
+deploy_monitor.py
+deploy_monitor.log
+deploy_status.json
+boe_laws
+BOE_*.md
+SEARCH_*.md
