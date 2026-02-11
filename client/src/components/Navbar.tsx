@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Scale, Menu, BookOpen, Info, LogOut, User, FileText } from "lucide-react";
+import { Scale, Menu, BookOpen, Info, LogOut, User, FileText, Newspaper } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ export function Navbar() {
     { href: "/library", label: "المكتبة", icon: BookOpen },
     { href: "/regulations", label: "اللوائح التنفيذية", icon: FileText },
     { href: "/judgments", label: "الأحكام القضائية", icon: Scale },
+    { href: "/gazette", label: "كشاف أم القرى", icon: Newspaper },
     { href: "/about", label: "عن المنصة", icon: Info },
   ];
 

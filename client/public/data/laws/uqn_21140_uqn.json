@@ -1,0 +1,51 @@
+{
+  "law_id": "uqn_21140",
+  "law_name": "جدول المخالفات والعقوبات لنشاط مرفق الضيافة السياحي",
+  "title": "جدول المخالفات والعقوبات لنشاط مرفق الضيافة السياحي",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "regulation",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1444/06/01",
+  "issue_date_gregorian": "25/12/2022",
+  "publish_date_hijri": "1444/06/01",
+  "publish_date_gregorian": "25/12/2022",
+  "issuing_authority": "لوائح وأنظمة",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=21140",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "جدول المخالفات والعقوبات لنشاط مرفق الضيافة السياحي\nتنزيل\nتنزيل الملف",
+      "original_text": "جدول المخالفات والعقوبات لنشاط مرفق الضيافة السياحي\nتنزيل\nتنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "جدول المخالفات والعقوبات لنشاط مرفق الضيافة السياحي",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

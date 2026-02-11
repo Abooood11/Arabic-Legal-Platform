@@ -1,0 +1,51 @@
+{
+  "law_id": "uqn_21598",
+  "law_name": "الإعلانات الحكومية معاد لعدد 4973",
+  "title": "الإعلانات الحكومية معاد لعدد 4973",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "gazette",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1444/08/18",
+  "issue_date_gregorian": "10/03/2023",
+  "publish_date_hijri": "1444/08/18",
+  "publish_date_gregorian": "10/03/2023",
+  "issuing_authority": "إعلانات",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=21598",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "الإعلانات الحكومية معاد لعدد 4973\nتنزيل\nتنزيل الملف",
+      "original_text": "الإعلانات الحكومية معاد لعدد 4973\nتنزيل\nتنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "الإعلانات الحكومية معاد لعدد 4973",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "law_id": "uqn_26896",
+  "law_name": "إعلان التسجيل العيني في المناطق العقارية بمنطقة مكة المكرمة",
+  "title": "إعلان التسجيل العيني في المناطق العقارية بمنطقة مكة المكرمة",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "regulation",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1446/07/10",
+  "issue_date_gregorian": "10/01/2025",
+  "publish_date_hijri": "1446/07/10",
+  "publish_date_gregorian": "10/01/2025",
+  "issuing_authority": "لوائح وأنظمة",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=26896",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "إعلان التسجيل العيني في المناطق العقارية بمنطقة مكة المكرمة\nتنزيل الملف",
+      "original_text": "إعلان التسجيل العيني في المناطق العقارية بمنطقة مكة المكرمة\nتنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "إعلان التسجيل العيني في المناطق العقارية بمنطقة مكة المكرمة",
+          "level": 0
+        },
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}

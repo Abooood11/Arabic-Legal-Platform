@@ -1,0 +1,41 @@
+{
+  "law_id": "uqn_26934",
+  "law_name": "الضوابط والأدلة الفنية لتصميم مرافق حرق النفايات وإنشائها وتشغيلها",
+  "title": "الضوابط والأدلة الفنية لتصميم مرافق حرق النفايات وإنشائها وتشغيلها",
+  "jurisdiction_ar": "السعودية",
+  "doc_type": "official_text",
+  "category": "regulation",
+  "primary_source_id": "uqn",
+  "status": "ساري",
+  "issue_date_hijri": "1446/07/21",
+  "issue_date_gregorian": "21/01/2025",
+  "publish_date_hijri": "1446/07/21",
+  "publish_date_gregorian": "21/01/2025",
+  "issuing_authority": "لوائح وأنظمة",
+  "links": [
+    {
+      "source_id": "uqn",
+      "url": "https://www.uqn.gov.sa/details?p=26934",
+      "label_ar": "جريدة أم القرى الرسمية"
+    }
+  ],
+  "total_articles": 1,
+  "articles": [
+    {
+      "number": 1,
+      "number_text": "المادة الأولى",
+      "text": "تنزيل الملف",
+      "original_text": "تنزيل الملف",
+      "status": "active",
+      "paragraphs": [
+        {
+          "marker": "",
+          "text": "تنزيل الملف",
+          "level": 0
+        }
+      ],
+      "amendments": [],
+      "heading_context": []
+    }
+  ]
+}
