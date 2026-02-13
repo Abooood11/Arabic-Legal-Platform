@@ -6,3 +6,15 @@ dist/
 rest-express@1.0.0
 set
 *.csv
+data.db
+data.db-shm
+data.db-wal
+data.db.gz
+nul
+test_*.json
+folder1_*.json
+sample_law.html
+boe_laws/
+deploy_status.json
+deploy_monitor.py
+run_deploy_monitor.bat
