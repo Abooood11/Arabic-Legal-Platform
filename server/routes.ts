@@ -38,6 +38,7 @@ export async function registerRoutes(
 
   app.get(api.sources.list.path, async (req, res) => {
     const sources = await storage.getSources();
+    res.set("Cache-Control", "public, max-age=600");
     res.json(sources);
   });
 
@@ -245,6 +246,7 @@ export async function registerRoutes(
         .groupBy(judgments.yearHijri)
         .orderBy(desc(judgments.yearHijri));
 
+      res.set("Cache-Control", "public, max-age=3600");
       res.json({ cities, courts, years });
     } catch (error) {
       console.error("Error fetching facets:", error);
@@ -496,6 +498,7 @@ export async function registerRoutes(
         .orderBy(sql`legislation_year DESC`)
         .limit(100);
 
+      res.set("Cache-Control", "public, max-age=3600");
       res.json({ categories, years, legislationYears });
     } catch (error) {
       console.error("Error fetching gazette facets:", error);

@@ -9,6 +9,11 @@ const sqlite = new Database(dbPath);
 // Enable WAL mode for better performance
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
+// Performance optimizations
+sqlite.pragma("cache_size = -65536");       // 64MB cache
+sqlite.pragma("mmap_size = 268435456");     // 256MB memory-mapped I/O
+sqlite.pragma("temp_store = MEMORY");       // temp tables in RAM
+sqlite.pragma("synchronous = NORMAL");      // faster writes
 
 export const db = drizzle(sqlite);
 export { sqlite };
