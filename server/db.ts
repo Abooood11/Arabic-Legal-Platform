@@ -117,4 +117,112 @@ try {
     console.warn("Gazette index setup:", e.message);
 }
 
+// ============================================
+// Law Articles FTS5 Index (for unified search)
+// ============================================
+try {
+    // Create a regular table to back the FTS content
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS law_articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            law_id TEXT NOT NULL,
+            law_name TEXT NOT NULL,
+            article_number INTEGER,
+            article_text TEXT NOT NULL,
+            article_heading TEXT
+        );
+    `);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS la_law_id_idx ON law_articles(law_id);`);
+
+    // Create FTS5 for law articles search
+    sqlite.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS law_articles_fts USING fts5(
+            law_id UNINDEXED,
+            law_name,
+            article_number UNINDEXED,
+            article_text,
+            article_heading,
+            content='law_articles',
+            content_rowid='id',
+            tokenize='unicode61 remove_diacritics 2'
+        );
+    `);
+
+    // Populate from law JSON files if table is empty
+    const laCount = sqlite.prepare("SELECT count(*) as cnt FROM law_articles").get() as any;
+    if (laCount.cnt === 0) {
+        const libraryPath = path.join(process.cwd(), "client", "public", "data", "library.json");
+        const lawsDir = path.join(process.cwd(), "client", "public", "data", "laws");
+
+        if (fs.existsSync(libraryPath) && fs.existsSync(lawsDir)) {
+            console.log("Building law articles FTS index... this may take a moment");
+            const library = JSON.parse(fs.readFileSync(libraryPath, "utf-8"));
+
+            const insert = sqlite.prepare(`
+                INSERT INTO law_articles (law_id, law_name, article_number, article_text, article_heading)
+                VALUES (?, ?, ?, ?, ?)
+            `);
+
+            let totalArticles = 0;
+            const insertBatch = sqlite.transaction((articles: any[]) => {
+                for (const a of articles) {
+                    insert.run(a.law_id, a.law_name, a.article_number, a.article_text, a.article_heading);
+                }
+            });
+
+            for (const item of library) {
+                // Try to load law file with different suffixes
+                const suffixes = ["", "_boe", "_uqn"];
+                let lawData: any = null;
+
+                for (const suffix of suffixes) {
+                    const filePath = path.join(lawsDir, `${item.id}${suffix}.json`);
+                    if (fs.existsSync(filePath)) {
+                        try {
+                            lawData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+                            break;
+                        } catch { continue; }
+                    }
+                }
+
+                if (lawData?.articles && Array.isArray(lawData.articles)) {
+                    const batch = lawData.articles.map((article: any) => ({
+                        law_id: item.id,
+                        law_name: lawData.law_name || item.title_ar || "",
+                        article_number: article.number || 0,
+                        article_text: article.text || "",
+                        article_heading: article.heading || "",
+                    }));
+                    if (batch.length > 0) {
+                        insertBatch(batch);
+                        totalArticles += batch.length;
+                    }
+                }
+            }
+
+            console.log(`Loaded ${totalArticles} law articles from ${library.length} laws.`);
+
+            // Populate FTS from the backing table
+            sqlite.exec(`
+                INSERT INTO law_articles_fts(rowid, law_id, law_name, article_number, article_text, article_heading)
+                SELECT id, law_id, law_name, article_number, article_text, article_heading FROM law_articles;
+            `);
+            console.log("Law articles FTS index populated.");
+        }
+    } else {
+        // Check if FTS is populated
+        const laFtsCount = sqlite.prepare("SELECT count(*) as cnt FROM law_articles_fts").get() as any;
+        if (laFtsCount.cnt === 0 && laCount.cnt > 0) {
+            console.log("Populating law articles FTS index...");
+            sqlite.exec(`
+                INSERT INTO law_articles_fts(rowid, law_id, law_name, article_number, article_text, article_heading)
+                SELECT id, law_id, law_name, article_number, article_text, article_heading FROM law_articles;
+            `);
+            console.log("Law articles FTS index populated.");
+        }
+    }
+} catch (e: any) {
+    console.warn("Law articles FTS setup:", e.message);
+}
+
 console.log(`Database connected: ${dbPath}`);

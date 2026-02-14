@@ -15,6 +15,7 @@ import LawDetail from "@/pages/LawDetail";
 import About from "@/pages/About";
 import ErrorReports from "@/pages/ErrorReports";
 import Regulations from "@/pages/Regulations";
+import UnifiedSearch from "@/pages/UnifiedSearch";
 
 // Scroll to top on every route change (fixes mobile not starting at top)
 function ScrollToTop() {
@@ -48,6 +49,7 @@ function Router() {
         <Route path="/judgments" component={Judgments} />
         <Route path="/judgments/:id" component={JudgmentDetail} />
         <Route path="/gazette" component={GazetteIndex} />
+        <Route path="/search" component={UnifiedSearch} />
         <Route path="/about" component={About} />
         <Route path="/regulations" component={Regulations} />
         <Route path="/law/:id" component={LawDetail} />

@@ -61,6 +61,562 @@ export async function registerRoutes(
     res.json(law);
   });
 
+  // ============================================
+  // Unified Search API - with Intent Detection & Smart Query Building
+  // ============================================
+
+  // Arabic legal synonyms for query expansion (comprehensive legal thesaurus)
+  const ARABIC_SYNONYMS: Record<string, string[]> = {
+    "عقد": ["عقود", "تعاقد", "اتفاقية", "اتفاق", "التزام"],
+    "زواج": ["نكاح", "زوجة", "زوج", "أسرة", "أحوال شخصية"],
+    "طلاق": ["فسخ", "خلع", "تفريق", "عدة"],
+    "بيع": ["شراء", "مبيع", "ثمن", "تجارة", "بائع", "مشتري"],
+    "إيجار": ["استئجار", "مؤجر", "مستأجر", "إجارة", "أجرة"],
+    "عمل": ["عامل", "عمالة", "وظيفة", "موظف", "خدمة", "صاحب عمل"],
+    "شركة": ["شركات", "مساهمة", "شريك", "حصة", "تجارية"],
+    "جريمة": ["جرائم", "جنائي", "عقوبة", "جزاء", "جناية", "جنحة"],
+    "ملكية": ["ملك", "تملك", "عقار", "عقارات", "حيازة"],
+    "تعويض": ["ضرر", "أضرار", "مسؤولية", "تبعة", "تضمين"],
+    "حقوق": ["حق", "حقوقي", "إنسان"],
+    "قاضي": ["قضاء", "محكمة", "دعوى", "حكم", "قضائي"],
+    "نفقة": ["إنفاق", "معيشة", "حضانة", "إعالة"],
+    "ميراث": ["إرث", "وراثة", "تركة", "ورثة", "فريضة"],
+    "تحكيم": ["محكم", "تسوية", "نزاع", "منازعات", "وساطة"],
+    "إفلاس": ["تصفية", "ديون", "دائن", "مدين", "إعسار"],
+    "ضريبة": ["ضرائب", "زكاة", "رسوم", "جمارك", "جبائي"],
+    "استئناف": ["طعن", "نقض", "اعتراض", "تمييز", "مراجعة"],
+    "كفالة": ["ضمان", "كفيل", "ضامن", "رهن", "تأمين"],
+    "وكالة": ["وكيل", "توكيل", "تفويض", "نيابة", "إنابة"],
+    "تنفيذ": ["تنفيذي", "إنفاذ", "سند تنفيذي", "محضر"],
+    "تزوير": ["تزييف", "مزور", "احتيال", "غش"],
+    "مخدرات": ["مؤثرات عقلية", "مسكرات", "ترويج"],
+    "سرقة": ["نهب", "اختلاس", "سارق"],
+    "قتل": ["جناية قتل", "دية", "قصاص"],
+    "مرور": ["حادث", "سير", "مركبة", "رخصة قيادة"],
+    "بيئة": ["تلوث", "بيئي", "حماية البيئة"],
+    "تجارة": ["تاجر", "سجل تجاري", "علامة تجارية"],
+    "بنك": ["مصرف", "بنوك", "مصرفي", "ائتمان"],
+    "تأمين": ["تأمينات", "وثيقة تأمين", "قسط"],
+    "إقامة": ["تأشيرة", "جواز", "هجرة", "وافد"],
+    "براءة اختراع": ["ملكية فكرية", "حقوق المؤلف", "اختراع"],
+  };
+
+  // Legal concepts mapping - maps broad legal domains to specific terms
+  const LEGAL_CONCEPTS: Record<string, { terms: string[]; types: ("laws" | "judgments" | "gazette")[] }> = {
+    "أحوال شخصية": { terms: ["زواج", "طلاق", "نفقة", "حضانة", "ميراث", "وصية", "نسب", "ولاية"], types: ["laws", "judgments"] },
+    "تجاري": { terms: ["شركة", "تجارة", "إفلاس", "أوراق تجارية", "سجل تجاري"], types: ["laws", "judgments", "gazette"] },
+    "عقاري": { terms: ["ملكية", "عقار", "رهن", "إيجار", "تسجيل عيني"], types: ["laws", "judgments"] },
+    "جزائي": { terms: ["جريمة", "عقوبة", "جناية", "جنحة", "سجن", "غرامة"], types: ["laws", "judgments"] },
+    "عمالي": { terms: ["عمل", "عامل", "فصل", "أجر", "إجازة", "تعويض"], types: ["laws", "judgments"] },
+    "إداري": { terms: ["قرار إداري", "جهة إدارية", "موظف", "ترخيص", "تظلم"], types: ["laws", "judgments", "gazette"] },
+  };
+
+  // Saudi cities list for intent detection
+  const SAUDI_CITIES = ["الرياض", "جدة", "مكة", "المدينة", "الدمام", "الخبر", "تبوك", "أبها", "جازان", "نجران", "حائل", "بريدة", "الطائف", "ينبع", "القصيم", "الجوف", "عرعر"];
+
+  // Detect user search intent
+  interface SearchIntent {
+    type: "all" | "laws" | "judgments" | "gazette";
+    priority: ("laws" | "judgments" | "gazette")[];
+    expandedTerms: string[];
+    articleNumber: number | null;
+    isLawName: boolean;
+    cityHint: string | null;
+  }
+
+  function detectSearchIntent(query: string): SearchIntent {
+    const q = query.trim();
+    const words = q.split(/\s+/);
+    const parsed = parseAdvancedQuery(q);
+
+    let type: SearchIntent["type"] = "all";
+    let priority: SearchIntent["priority"] = ["laws", "judgments", "gazette"];
+    let articleNumber: number | null = null;
+    let isLawName = false;
+    let cityHint: string | null = null;
+    const expandedTerms: string[] = [];
+
+    // --- Field-based intent detection ---
+    if (parsed.fields["محكمة"] || parsed.fields["مدينة"]) {
+      priority = ["judgments", "laws", "gazette"];
+      if (parsed.fields["مدينة"]) cityHint = parsed.fields["مدينة"];
+    }
+    if (parsed.fields["مادة"]) {
+      articleNumber = parseInt(parsed.fields["مادة"]);
+      priority = ["laws", "gazette", "judgments"];
+    }
+    if (parsed.fields["فئة"]) {
+      priority = ["gazette", "laws", "judgments"];
+    }
+
+    // Detect article number patterns: "مادة 5", "المادة الخامسة", "م5"
+    const articleMatch = q.match(/(?:المادة|مادة|م)\s*(\d+)/);
+    if (articleMatch) {
+      articleNumber = parseInt(articleMatch[1]);
+      priority = ["laws", "gazette", "judgments"];
+    }
+
+    // Detect if query looks like a law name: starts with "نظام" or "لائحة" or "قرار"
+    if (q.startsWith("نظام") || q.startsWith("لائحة") || q.startsWith("قرار") || q.startsWith("مرسوم")) {
+      isLawName = true;
+      priority = ["laws", "gazette", "judgments"];
+    }
+
+    // Detect city → prioritize judgments
+    for (const city of SAUDI_CITIES) {
+      if (q.includes(city)) {
+        cityHint = city;
+        priority = ["judgments", "laws", "gazette"];
+        break;
+      }
+    }
+
+    // Detect court-related terms → prioritize judgments
+    if (q.includes("محكمة") || q.includes("دعوى") || q.includes("حكم") || q.includes("قاضي") || q.includes("دائرة")) {
+      priority = ["judgments", "laws", "gazette"];
+    }
+
+    // Detect gazette-related terms
+    if (q.includes("جريدة") || q.includes("أم القرى") || q.includes("عدد") || q.includes("مرسوم ملكي")) {
+      priority = ["gazette", "laws", "judgments"];
+    }
+
+    // --- Legal concept detection ---
+    for (const [concept, config] of Object.entries(LEGAL_CONCEPTS)) {
+      // Check if query matches a legal domain concept
+      if (q.includes(concept) || config.terms.some(t => q.includes(t))) {
+        // Add related terms from this legal concept
+        expandedTerms.push(...config.terms.filter(t => !q.includes(t)));
+        // Adjust priority based on concept's relevant types
+        if (config.types[0] !== priority[0]) {
+          priority = [...config.types, ...priority.filter(p => !config.types.includes(p))] as SearchIntent["priority"];
+        }
+        break; // Only use first matching concept
+      }
+    }
+
+    // --- Expand query with synonyms ---
+    for (const word of words) {
+      const cleanWord = word.replace(/^ال/, ""); // Remove ال prefix for matching
+      for (const [key, synonyms] of Object.entries(ARABIC_SYNONYMS)) {
+        if (word === key || word === `ال${key}` || cleanWord === key) {
+          expandedTerms.push(...synonyms.filter(s => !words.includes(s)));
+          break;
+        }
+        // Also check if the word matches a synonym → add the key
+        if (synonyms.includes(word) || synonyms.includes(cleanWord)) {
+          expandedTerms.push(key);
+          break;
+        }
+      }
+    }
+
+    return { type, priority, expandedTerms: Array.from(new Set(expandedTerms)).slice(0, 8), articleNumber, isLawName, cityHint };
+  }
+
+  // ============================================
+  // Advanced Search Query Parser
+  // Supports: "exact phrase", -exclude, field:value, boolean operators
+  // ============================================
+  interface ParsedQuery {
+    phrases: string[];      // Exact phrases in quotes
+    required: string[];     // Regular terms (AND)
+    excluded: string[];     // Terms prefixed with -
+    fields: Record<string, string>; // field:value pairs
+    rawTerms: string[];     // All raw terms for FTS
+  }
+
+  function parseAdvancedQuery(raw: string): ParsedQuery {
+    const phrases: string[] = [];
+    const required: string[] = [];
+    const excluded: string[] = [];
+    const fields: Record<string, string> = {};
+
+    // Extract quoted phrases first: "exact phrase"
+    let remaining = raw;
+    const phraseRegex = /"([^"]+)"/g;
+    let match;
+    while ((match = phraseRegex.exec(raw)) !== null) {
+      phrases.push(match[1].trim());
+      remaining = remaining.replace(match[0], " ");
+    }
+    // Also support Arabic quotes «exact phrase»
+    const arabicQuoteRegex = /«([^»]+)»/g;
+    while ((match = arabicQuoteRegex.exec(raw)) !== null) {
+      phrases.push(match[1].trim());
+      remaining = remaining.replace(match[0], " ");
+    }
+
+    // Parse remaining words
+    const words = remaining.trim().split(/\s+/).filter(Boolean);
+    for (const word of words) {
+      // Exclusion: -term
+      if (word.startsWith("-") && word.length > 1) {
+        excluded.push(word.slice(1));
+        continue;
+      }
+      // Field search: field:value (e.g., محكمة:الرياض, سنة:1445)
+      const fieldMatch = word.match(/^(محكمة|مدينة|سنة|نظام|فئة|مادة):(.+)/);
+      if (fieldMatch) {
+        fields[fieldMatch[1]] = fieldMatch[2];
+        continue;
+      }
+      required.push(word);
+    }
+
+    return {
+      phrases,
+      required,
+      excluded,
+      fields,
+      rawTerms: [...phrases.flatMap(p => p.split(/\s+/)), ...required],
+    };
+  }
+
+  // Smart FTS query builder with synonym expansion + advanced operators
+  function buildFtsQuery(raw: string, expandedTerms: string[] = []): string {
+    const parsed = parseAdvancedQuery(raw);
+    const parts: string[] = [];
+
+    // Add required terms with prefix matching
+    if (parsed.required.length > 0) {
+      parts.push(parsed.required.map(w => `${w}*`).join(" "));
+    }
+
+    // Add exact phrases (no wildcard, wrapped in quotes for FTS5)
+    for (const phrase of parsed.phrases) {
+      parts.push(`"${phrase}"`);
+    }
+
+    // Build NOT clauses
+    const notClauses = parsed.excluded.map(w => `NOT ${w}*`).join(" ");
+
+    let mainQuery = parts.join(" ");
+    if (notClauses) {
+      mainQuery = `(${mainQuery}) ${notClauses}`;
+    }
+
+    if (expandedTerms.length === 0) return mainQuery || raw.trim().split(/\s+/).map(w => `${w}*`).join(" ");
+
+    // Build OR expansion: (original terms) OR (synonym1*) OR (synonym2*)
+    const expansions = expandedTerms.map(t => `${t}*`);
+    return `(${mainQuery}) OR (${expansions.join(" OR ")})`;
+  }
+
+  // Prepared statements for search (faster than building each time)
+  const searchLawsStmt = sqlite.prepare(`
+    SELECT la.law_id, la.law_name, la.article_number, la.article_heading,
+           snippet(law_articles_fts, 3, '【', '】', '...', 40) as textSnippet,
+           bm25(law_articles_fts) as rank
+    FROM law_articles la
+    INNER JOIN law_articles_fts fts ON la.id = fts.rowid
+    WHERE law_articles_fts MATCH ?
+    ORDER BY rank
+    LIMIT ? OFFSET ?
+  `);
+
+  const countLawsStmt = sqlite.prepare(`
+    SELECT count(*) as count
+    FROM law_articles la
+    INNER JOIN law_articles_fts fts ON la.id = fts.rowid
+    WHERE law_articles_fts MATCH ?
+  `);
+
+  const searchJudgmentsStmt = sqlite.prepare(`
+    SELECT j.id, j.case_id, j.year_hijri, j.city, j.court_body, j.judgment_date, j.source,
+           snippet(judgments_fts, 0, '【', '】', '...', 40) as textSnippet,
+           bm25(judgments_fts) as rank
+    FROM judgments j
+    INNER JOIN judgments_fts fts ON j.id = fts.rowid
+    WHERE judgments_fts MATCH ?
+    ORDER BY rank
+    LIMIT ? OFFSET ?
+  `);
+
+  const countJudgmentsStmt = sqlite.prepare(`
+    SELECT count(*) as count
+    FROM judgments j
+    INNER JOIN judgments_fts fts ON j.id = fts.rowid
+    WHERE judgments_fts MATCH ?
+  `);
+
+  const searchGazetteStmt = sqlite.prepare(`
+    SELECT g.id, g.issue_year, g.issue_number, g.legislation_number, g.legislation_year, g.category,
+           snippet(gazette_fts, 0, '【', '】', '...', 40) as titleSnippet,
+           bm25(gazette_fts) as rank
+    FROM gazette_index g
+    INNER JOIN gazette_fts fts ON g.id = fts.rowid
+    WHERE gazette_fts MATCH ?
+    ORDER BY rank
+    LIMIT ? OFFSET ?
+  `);
+
+  const countGazetteStmt = sqlite.prepare(`
+    SELECT count(*) as count
+    FROM gazette_index g
+    INNER JOIN gazette_fts fts ON g.id = fts.rowid
+    WHERE gazette_fts MATCH ?
+  `);
+
+  app.get("/api/search", async (req, res) => {
+    try {
+      const startTime = Date.now();
+      const q = (req.query.q as string || "").trim();
+      const type = (req.query.type as string) || "all";
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+      const offset = (page - 1) * limit;
+
+      if (q.length < 2) {
+        return res.json({
+          query: q,
+          totalResults: 0,
+          timeTaken: 0,
+          intent: null,
+          results: { laws: { items: [], total: 0 }, judgments: { items: [], total: 0 }, gazette: { items: [], total: 0 } }
+        });
+      }
+
+      // Detect user intent for smarter results
+      const intent = detectSearchIntent(q);
+      const effectiveType = type !== "all" ? type : intent.type;
+      const ftsQuery = buildFtsQuery(q, intent.expandedTerms);
+
+      // Search all sources - priority order affects "all" tab display
+      const searchLaws = () => {
+        if (type !== "all" && type !== "laws") return { items: [], total: 0 };
+        try {
+          const items = searchLawsStmt.all(ftsQuery, limit, offset) as any[];
+          const countResult = countLawsStmt.get(ftsQuery) as any;
+          return { items, total: countResult?.count || 0 };
+        } catch { return { items: [], total: 0 }; }
+      };
+
+      const searchJudgments = () => {
+        if (type !== "all" && type !== "judgments") return { items: [], total: 0 };
+        try {
+          const items = searchJudgmentsStmt.all(ftsQuery, limit, offset) as any[];
+          const countResult = countJudgmentsStmt.get(ftsQuery) as any;
+          return { items, total: countResult?.count || 0 };
+        } catch { return { items: [], total: 0 }; }
+      };
+
+      const searchGazette = () => {
+        if (type !== "all" && type !== "gazette") return { items: [], total: 0 };
+        try {
+          const items = searchGazetteStmt.all(ftsQuery, limit, offset) as any[];
+          const countResult = countGazetteStmt.get(ftsQuery) as any;
+          return { items, total: countResult?.count || 0 };
+        } catch { return { items: [], total: 0 }; }
+      };
+
+      // Execute all searches (SQLite is sync so they run sequentially, but each is fast with FTS5)
+      const lawResults = searchLaws();
+      const judgmentResults = searchJudgments();
+      const gazetteResults = searchGazette();
+
+      const timeTaken = Date.now() - startTime;
+      const totalResults = lawResults.total + judgmentResults.total + gazetteResults.total;
+
+      // Cross-reference: find related content across types
+      const crossLinks: { lawsToJudgments: string[]; lawsToGazette: string[]; relatedLaws: string[] } = { lawsToJudgments: [], lawsToGazette: [], relatedLaws: [] };
+      if (type === "all" && lawResults.items.length > 0) {
+        const lawNames = Array.from(new Set(lawResults.items.map((l: any) => l.law_name).filter(Boolean))).slice(0, 3);
+        for (const name of lawNames) {
+          if (judgmentResults.total > 0) crossLinks.lawsToJudgments.push(name as string);
+          if (gazetteResults.total > 0) crossLinks.lawsToGazette.push(name as string);
+        }
+        // Extract unique law_ids for cross-law referencing
+        const lawIds = Array.from(new Set(lawResults.items.map((l: any) => l.law_id))).slice(0, 5);
+        crossLinks.relatedLaws = lawIds as string[];
+      }
+
+      // Build faceted counts for advanced filtering
+      const facets: { years: {year: number, count: number}[], cities: {city: string, count: number}[], categories: {category: string, count: number}[] } = {
+        years: [], cities: [], categories: []
+      };
+
+      try {
+        if (type === "all" || type === "judgments") {
+          // Get judgment year facets for this query
+          const yearFacets = sqlite.prepare(`
+            SELECT j.year_hijri as year, count(*) as count
+            FROM judgments j
+            INNER JOIN judgments_fts fts ON j.id = fts.rowid
+            WHERE judgments_fts MATCH ? AND j.year_hijri IS NOT NULL
+            GROUP BY j.year_hijri ORDER BY count DESC LIMIT 10
+          `).all(ftsQuery) as any[];
+          facets.years = yearFacets;
+
+          // Get city facets
+          const cityFacets = sqlite.prepare(`
+            SELECT j.city as city, count(*) as count
+            FROM judgments j
+            INNER JOIN judgments_fts fts ON j.id = fts.rowid
+            WHERE judgments_fts MATCH ? AND j.city IS NOT NULL AND j.city != ''
+            GROUP BY j.city ORDER BY count DESC LIMIT 10
+          `).all(ftsQuery) as any[];
+          facets.cities = cityFacets;
+        }
+
+        if (type === "all" || type === "gazette") {
+          // Get gazette category facets
+          const catFacets = sqlite.prepare(`
+            SELECT g.category as category, count(*) as count
+            FROM gazette_index g
+            INNER JOIN gazette_fts fts ON g.id = fts.rowid
+            WHERE gazette_fts MATCH ? AND g.category IS NOT NULL AND g.category != ''
+            GROUP BY g.category ORDER BY count DESC LIMIT 10
+          `).all(ftsQuery) as any[];
+          facets.categories = catFacets;
+        }
+      } catch {}
+
+      // Parse advanced query info for frontend display
+      const parsedInfo = parseAdvancedQuery(q);
+
+      res.set("Cache-Control", "public, max-age=60");
+      res.json({
+        query: q,
+        totalResults,
+        timeTaken,
+        intent: {
+          priority: intent.priority,
+          expandedTerms: intent.expandedTerms,
+          articleNumber: intent.articleNumber,
+          isLawName: intent.isLawName,
+          cityHint: intent.cityHint,
+        },
+        advanced: {
+          phrases: parsedInfo.phrases,
+          excluded: parsedInfo.excluded,
+          fields: parsedInfo.fields,
+          hasBooleanOps: parsedInfo.phrases.length > 0 || parsedInfo.excluded.length > 0 || Object.keys(parsedInfo.fields).length > 0,
+        },
+        facets,
+        crossLinks,
+        results: {
+          laws: lawResults,
+          judgments: judgmentResults,
+          gazette: gazetteResults,
+        }
+      });
+    } catch (err: any) {
+      console.error("Search error:", err);
+      res.status(500).json({ error: "Search failed", message: err.message });
+    }
+  });
+
+  // ============================================
+  // Related Articles API - finds related content across types
+  // ============================================
+  app.get("/api/search/related", async (req, res) => {
+    try {
+      const lawId = req.query.lawId as string;
+      const lawName = req.query.lawName as string;
+      const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
+
+      if (!lawName && !lawId) return res.json({ judgments: [], gazette: [] });
+
+      const searchTerm = (lawName || "").split(/\s+/).slice(0, 4).map(w => `${w}*`).join(" ");
+
+      let relatedJudgments: any[] = [];
+      let relatedGazette: any[] = [];
+
+      if (searchTerm) {
+        try {
+          relatedJudgments = sqlite.prepare(`
+            SELECT j.id, j.court_body, j.city, j.year_hijri,
+                   snippet(judgments_fts, 0, '【', '】', '...', 30) as textSnippet
+            FROM judgments j
+            INNER JOIN judgments_fts fts ON j.id = fts.rowid
+            WHERE judgments_fts MATCH ?
+            ORDER BY bm25(judgments_fts)
+            LIMIT ?
+          `).all(searchTerm, limit) as any[];
+        } catch {}
+
+        try {
+          relatedGazette = sqlite.prepare(`
+            SELECT g.id, g.issue_year, g.issue_number, g.category,
+                   snippet(gazette_fts, 0, '【', '】', '...', 30) as titleSnippet
+            FROM gazette_index g
+            INNER JOIN gazette_fts fts ON g.id = fts.rowid
+            WHERE gazette_fts MATCH ?
+            ORDER BY bm25(gazette_fts)
+            LIMIT ?
+          `).all(searchTerm, limit) as any[];
+        } catch {}
+      }
+
+      res.set("Cache-Control", "public, max-age=300");
+      res.json({ judgments: relatedJudgments, gazette: relatedGazette });
+    } catch (err: any) {
+      res.json({ judgments: [], gazette: [] });
+    }
+  });
+
+  // ============================================
+  // Search Statistics API
+  // ============================================
+  app.get("/api/search/stats", async (req, res) => {
+    try {
+      const lawCount = (sqlite.prepare("SELECT count(*) as cnt FROM law_articles").get() as any)?.cnt || 0;
+      const judgmentCount = (sqlite.prepare("SELECT count(*) as cnt FROM judgments").get() as any)?.cnt || 0;
+      const gazetteCount = (sqlite.prepare("SELECT count(*) as cnt FROM gazette_index").get() as any)?.cnt || 0;
+      const lawNamesCount = (sqlite.prepare("SELECT count(DISTINCT law_id) as cnt FROM law_articles").get() as any)?.cnt || 0;
+
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json({
+        totalDocuments: lawCount + judgmentCount + gazetteCount,
+        laws: { articles: lawCount, laws: lawNamesCount },
+        judgments: { total: judgmentCount },
+        gazette: { total: gazetteCount },
+      });
+    } catch {
+      res.json({ totalDocuments: 0, laws: { articles: 0, laws: 0 }, judgments: { total: 0 }, gazette: { total: 0 } });
+    }
+  });
+
+  // Search suggestions API
+  let suggestionsCache: { data: any[]; timestamp: number } | null = null;
+  const SUGGESTIONS_CACHE_TTL = 3600000; // 1 hour
+
+  app.get("/api/search/suggest", async (req, res) => {
+    try {
+      const q = (req.query.q as string || "").trim();
+      if (q.length < 1) return res.json([]);
+
+      // Build/refresh suggestions corpus (cached for 1 hour)
+      if (!suggestionsCache || Date.now() - suggestionsCache.timestamp > SUGGESTIONS_CACHE_TTL) {
+        const library = await storage.getLibrary();
+        const lawTitles = library.map(item => ({ text: item.title_ar, type: "law" }));
+
+        const courts = sqlite.prepare("SELECT DISTINCT court_body FROM judgments WHERE court_body IS NOT NULL AND court_body != ''").all() as any[];
+        const courtSuggestions = courts.map(c => ({ text: c.court_body, type: "court" }));
+
+        const categories = sqlite.prepare("SELECT DISTINCT category FROM gazette_index WHERE category IS NOT NULL AND category != ''").all() as any[];
+        const categorySuggestions = categories.map(c => ({ text: c.category, type: "gazette_category" }));
+
+        suggestionsCache = {
+          data: [...lawTitles, ...courtSuggestions, ...categorySuggestions],
+          timestamp: Date.now()
+        };
+      }
+
+      // Filter suggestions matching the query
+      const results = suggestionsCache.data
+        .filter(item => item.text.includes(q))
+        .slice(0, 8);
+
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json(results);
+    } catch (err: any) {
+      console.error("Suggest error:", err);
+      res.json([]);
+    }
+  });
+
   // Judgments API
   app.get("/api/judgments", async (req, res) => {
     try {

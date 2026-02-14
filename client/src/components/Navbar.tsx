@@ -1,16 +1,29 @@
 import { Link, useLocation } from "wouter";
-import { Scale, Menu, BookOpen, Info, LogOut, User, FileText, Newspaper } from "lucide-react";
-import { useState } from "react";
+import { Scale, Menu, BookOpen, Info, LogOut, User, FileText, Newspaper, Search } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 
 export function Navbar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const { user, isAuthenticated, logout, isLoading } = useAuth();
 
+  // Global Ctrl+K shortcut to open search page
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setLocation("/search");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [setLocation]);
+
   const links = [
+    { href: "/search", label: "البحث", icon: Search },
     { href: "/library", label: "الأنظمة واللوائح", icon: BookOpen },
     { href: "/judgments", label: "الأحكام القضائية", icon: Scale },
     { href: "/gazette", label: "كشاف جريدة أم القرى", icon: Newspaper },
@@ -37,10 +50,15 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items-center gap-2 text-base font-medium transition-colors hover:text-primary ${location === link.href ? "text-primary" : "text-muted-foreground"}`}
+              className={`flex items-center gap-2 text-base font-medium transition-colors hover:text-primary ${location === link.href || (link.href === "/search" && location.startsWith("/search")) ? "text-primary" : "text-muted-foreground"}`}
             >
               <link.icon className="w-5 h-5" />
               {link.label}
+              {link.href === "/search" && (
+                <kbd className="hidden lg:inline-flex items-center text-[10px] font-mono bg-muted/80 text-muted-foreground px-1.5 py-0.5 rounded border mr-0.5">
+                  Ctrl+K
+                </kbd>
+              )}
             </Link>
           ))}
         </nav>
