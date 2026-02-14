@@ -295,6 +295,8 @@ interface CabinetDecisionData {
   opening: string;
   recitals?: string[];
   resolution?: string;
+  decision_intro?: string;
+  provisions?: string[];
   closing: string;
   signature: string;
 }

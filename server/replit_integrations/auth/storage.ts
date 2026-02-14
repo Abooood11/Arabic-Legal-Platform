@@ -23,7 +23,7 @@ class AuthStorage implements IAuthStorage {
         target: users.id,
         set: {
           ...userData,
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(),
         },
       })
       .returning();
