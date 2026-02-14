@@ -62,6 +62,14 @@ interface GazetteFacets {
     legislationYears: { year: string; count: number }[];
 }
 
+const SAUDI_GAZETTE_QUERIES = [
+    "نظام الشركات",
+    "اللائحة التنفيذية",
+    "قرار مجلس الوزراء",
+    "مرسوم ملكي",
+    "نظام العمل",
+];
+
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
     useEffect(() => {
@@ -110,20 +118,22 @@ export default function GazetteIndex() {
     const [yearFilter, setYearFilter] = useState("");
     const [legYearFilter, setLegYearFilter] = useState("");
     const [filterOpen, setFilterOpen] = useState(false);
+    const [exactSearch, setExactSearch] = useState(false);
 
     const debouncedSearch = useDebounce(search, 400);
 
     // Reset page on filter change
-    useEffect(() => { setPage(1); }, [debouncedSearch, categoryFilter, yearFilter, legYearFilter]);
+    useEffect(() => { setPage(1); }, [debouncedSearch, categoryFilter, yearFilter, legYearFilter, exactSearch]);
 
     const queryParams = useMemo(() => {
         const params = new URLSearchParams({ page: page.toString(), limit: "20" });
         if (debouncedSearch) params.set("q", debouncedSearch);
+        if (exactSearch) params.set("exact", "true");
         if (categoryFilter) params.set("category", categoryFilter);
         if (yearFilter) params.set("year", yearFilter);
         if (legYearFilter) params.set("legislationYear", legYearFilter);
         return params.toString();
-    }, [page, debouncedSearch, categoryFilter, yearFilter, legYearFilter]);
+    }, [page, debouncedSearch, exactSearch, categoryFilter, yearFilter, legYearFilter]);
 
     const { data, isLoading, isFetching } = useQuery<GazetteResponse>({
         queryKey: ["gazette", queryParams],
@@ -182,6 +192,33 @@ export default function GazetteIndex() {
                             </button>
                         )}
                     </div>
+
+                    {/* Exact Search Toggle + Preset Queries */}
+                    <div className="flex items-center gap-3 mt-3 max-w-2xl flex-wrap">
+                        <Button
+                            variant={exactSearch ? "default" : "outline"}
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            onClick={() => setExactSearch(!exactSearch)}
+                        >
+                            {exactSearch ? "✓ بحث حرفي" : "بحث حرفي"}
+                        </Button>
+                        <span className="text-xs text-muted-foreground">استعلامات تشريعية:</span>
+                        {SAUDI_GAZETTE_QUERIES.map((q) => (
+                            <button
+                                key={q}
+                                onClick={() => setSearch(q)}
+                                className="text-xs px-2.5 py-1 rounded-full bg-primary/5 text-primary hover:bg-primary/10 transition-colors border border-primary/20"
+                            >
+                                {q}
+                            </button>
+                        ))}
+                    </div>
+                    {!exactSearch && search && (
+                        <p className="text-xs text-muted-foreground mt-2 max-w-2xl">
+                            💡 استخدم أرقام الأدوات التشريعية أو العبارات الدقيقة مع "بحث حرفي" للحصول على نتائج أدق.
+                        </p>
+                    )}
 
                     {/* Stats */}
                     {data?.pagination && !isLoading && (

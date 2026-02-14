@@ -75,6 +75,15 @@ interface Facets {
 
 type SourceTab = "" | "sa_judicial" | "eg_naqd";
 
+const SAUDI_LEGAL_QUERIES = [
+    "مبدأ قضائي",
+    "مادة 77 عقد العمل",
+    "تعويض ضرر",
+    "فسخ عقد إيجار",
+    "حضانة أطفال",
+    "نفقة زوجية",
+];
+
 const TABS: { key: SourceTab; label: string; shortLabel: string; icon: React.ReactNode; color: string; activeColor: string; badgeColor: string }[] = [
     {
         key: "",
@@ -163,6 +172,7 @@ export default function Judgments() {
     const [sort, setSort] = useState("date");
     const [filterOpen, setFilterOpen] = useState(false);
     const [judgeFilter, setJudgeFilter] = useState("");
+    const [exactSearch, setExactSearch] = useState(false);
 
     // Read judge param from URL on mount
     useEffect(() => {
@@ -182,19 +192,20 @@ export default function Judgments() {
 
     const debouncedSearch = useDebounce(search, 400);
 
-    useEffect(() => { setPage(1); }, [debouncedSearch, cityFilter, courtFilter, yearFilter, activeTab, judgeFilter]);
+    useEffect(() => { setPage(1); }, [debouncedSearch, cityFilter, courtFilter, yearFilter, activeTab, judgeFilter, exactSearch]);
     useEffect(() => { setCityFilter(""); setCourtFilter(""); setYearFilter(""); }, [activeTab]);
 
     const queryParams = useMemo(() => {
         const params = new URLSearchParams({ page: page.toString(), limit: "20", sort });
         if (debouncedSearch) params.set("q", debouncedSearch);
+        if (exactSearch) params.set("exact", "true");
         if (cityFilter) params.set("city", cityFilter);
         if (courtFilter) params.set("court", courtFilter);
         if (yearFilter) params.set("year", yearFilter);
         if (activeTab) params.set("source", activeTab);
         if (judgeFilter) params.set("judge", judgeFilter);
         return params.toString();
-    }, [page, debouncedSearch, cityFilter, courtFilter, yearFilter, activeTab, sort, judgeFilter]);
+    }, [page, debouncedSearch, exactSearch, cityFilter, courtFilter, yearFilter, activeTab, sort, judgeFilter]);
 
     const { data, isLoading, isFetching } = useQuery<JudgmentsResponse>({
         queryKey: ["judgments", queryParams],
@@ -285,6 +296,33 @@ export default function Judgments() {
                             </button>
                         )}
                     </div>
+
+                    {/* Exact Search Toggle + Preset Queries */}
+                    <div className="flex items-center gap-3 mt-3 max-w-2xl flex-wrap">
+                        <Button
+                            variant={exactSearch ? "default" : "outline"}
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            onClick={() => setExactSearch(!exactSearch)}
+                        >
+                            {exactSearch ? "✓ بحث حرفي" : "بحث حرفي"}
+                        </Button>
+                        <span className="text-xs text-muted-foreground">بحث شائع:</span>
+                        {SAUDI_LEGAL_QUERIES.map((q) => (
+                            <button
+                                key={q}
+                                onClick={() => setSearch(q)}
+                                className="text-xs px-2.5 py-1 rounded-full bg-primary/5 text-primary hover:bg-primary/10 transition-colors border border-primary/20"
+                            >
+                                {q}
+                            </button>
+                        ))}
+                    </div>
+                    {!exactSearch && search && (
+                        <p className="text-xs text-muted-foreground mt-2 max-w-2xl">
+                            💡 البحث يتوسع تلقائياً ليشمل المرادفات القانونية. استخدم "بحث حرفي" للنتائج المطابقة تماماً.
+                        </p>
+                    )}
                 </div>
             </div>
 

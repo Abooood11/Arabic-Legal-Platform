@@ -8,6 +8,7 @@ import { articleOverrides, errorReports, judgments, gazetteIndex } from "@shared
 import { eq, and, desc, sql, like } from "drizzle-orm";
 import { readLatestLegalMonitoringReport, runLegalMonitoringScan } from "./legalMonitoring";
 import { setupAnalyticsSchema, recordAnalyticsEvent } from "./analytics";
+import { buildLegalFtsQuery, buildLiteralFtsQuery } from "./searchUtils";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -901,7 +902,7 @@ export async function registerRoutes(
       const offset = (page - 1) * limit;
       const sort = (req.query.sort as string) || "date";
 
-      const { q, city, year, court, hasDate, source, judge } = req.query;
+      const { q, city, year, court, hasDate, source, judge, exact } = req.query;
 
       // Use FTS5 for text search when q is provided
       if (q && typeof q === "string" && q.trim().length > 0) {
@@ -925,8 +926,10 @@ export async function registerRoutes(
           else if (sort === "city") orderSQL = "ORDER BY j.city";
           else if (sort === "court") orderSQL = "ORDER BY j.court_body";
 
-          // Better Arabic search: allow partial matches and handle diacritics
-          const ftsQuery = q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
+          // Better Arabic search: use exact/literal search or legal synonym-expanded search
+          const ftsQuery = exact === "true"
+            ? buildLiteralFtsQuery(q)
+            : buildLegalFtsQuery(q) || q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
 
           const countStmt = sqlite.prepare(`
             SELECT count(*) as count FROM judgments j
@@ -1370,7 +1373,7 @@ export async function registerRoutes(
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
       const offset = (page - 1) * limit;
 
-      const { q, category, year, legislationYear } = req.query;
+      const { q, category, year, legislationYear, exact } = req.query;
 
       // FTS5 path
       if (q && typeof q === "string" && q.trim().length > 0) {
@@ -1383,7 +1386,9 @@ export async function registerRoutes(
           if (legislationYear) { filters.push("g.legislation_year = ?"); params.push(legislationYear); }
 
           const filterSQL = filters.length > 0 ? "AND " + filters.join(" AND ") : "";
-          const ftsQuery = q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
+          const ftsQuery = exact === "true"
+            ? buildLiteralFtsQuery(q as string)
+            : buildLegalFtsQuery(q as string) || q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
 
           const countStmt = sqlite.prepare(`
             SELECT count(*) as count FROM gazette_index g
