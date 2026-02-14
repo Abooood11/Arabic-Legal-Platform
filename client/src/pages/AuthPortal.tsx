@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -26,16 +26,6 @@ export default function AuthPortal() {
   const [login, setLogin] = useState({ email: "", password: "", totpCode: "" });
   const [register, setRegister] = useState({ firstName: "", lastName: "", email: "", password: "" });
 
-  // Check if Google OAuth is configured
-  const { data: googleStatus } = useQuery({
-    queryKey: ["google-oauth-status"],
-    queryFn: async () => {
-      const res = await fetch("/api/auth/google/status");
-      return res.json() as Promise<{ enabled: boolean }>;
-    },
-    staleTime: Infinity,
-  });
-
   // Show error from Google OAuth redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -47,9 +37,9 @@ export default function AuthPortal() {
         token_exchange: "فشل الاتصال بحساب Google",
         profile_fetch: "تعذر جلب بيانات الحساب من Google",
         server_error: "حدث خطأ في الخادم",
+        not_configured: "تسجيل الدخول عبر Google غير مُفعّل حالياً",
       };
       toast({ variant: "destructive", title: messages[error] || "حدث خطأ" });
-      // Clean up URL
       window.history.replaceState({}, "", "/auth");
     }
   }, [toast]);
@@ -105,27 +95,23 @@ export default function AuthPortal() {
           <CardTitle>تسجيل الدخول</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Google OAuth Button */}
-          {googleStatus?.enabled && (
-            <>
-              <Button
-                variant="outline"
-                className="w-full gap-3 h-11 text-sm font-medium"
-                onClick={handleGoogleLogin}
-              >
-                <GoogleIcon className="w-5 h-5" />
-                المتابعة عبر حساب Google
-              </Button>
-              <div className="relative my-5">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">أو</span>
-                </div>
-              </div>
-            </>
-          )}
+          {/* Google OAuth Button - always visible */}
+          <Button
+            variant="outline"
+            className="w-full gap-3 h-11 text-sm font-medium"
+            onClick={handleGoogleLogin}
+          >
+            <GoogleIcon className="w-5 h-5" />
+            المتابعة عبر حساب Google
+          </Button>
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">أو</span>
+            </div>
+          </div>
 
           <Tabs defaultValue="login">
             <TabsList className="grid grid-cols-2 w-full">

@@ -383,8 +383,8 @@ export function registerAuthRoutes(app: Express) {
 
   // Step 1: Redirect user to Google consent screen
   app.get("/api/auth/google", (req, res) => {
-    if (!GOOGLE_CLIENT_ID) {
-      return res.status(500).json({ message: "Google OAuth not configured" });
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return res.redirect("/auth?error=not_configured");
     }
 
     const state = randomToken(32);
