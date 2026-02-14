@@ -10,6 +10,61 @@ import { readLatestLegalMonitoringReport, runLegalMonitoringScan } from "./legal
 import { setupAnalyticsSchema, recordAnalyticsEvent } from "./analytics";
 import { buildLegalFtsQuery, buildLiteralFtsQuery } from "./searchUtils";
 
+const saudiGazetteCategoryCaseSql = (alias: string) => `
+  CASE
+    WHEN COALESCE(${alias}.category, '') LIKE '%مرسوم ملكي%' THEN 'مراسيم ملكية'
+    WHEN COALESCE(${alias}.category, '') LIKE '%أمر ملكي%' OR COALESCE(${alias}.category, '') LIKE '%أمر سام%' THEN 'أوامر ملكية وسامية'
+    WHEN COALESCE(${alias}.category, '') LIKE '%قرار مجلس الوزراء%' THEN 'قرارات مجلس الوزراء'
+    WHEN COALESCE(${alias}.category, '') IN ('نظام', 'نظام أساسي', 'قانون')
+      OR ${alias}.title LIKE '%نظام %'
+      OR ${alias}.title LIKE 'نظام%'
+      THEN 'أنظمة'
+    WHEN COALESCE(${alias}.category, '') LIKE '%لائحة%'
+      OR ${alias}.title LIKE '%اللائحة%'
+      OR ${alias}.title LIKE '%لائحة%'
+      THEN 'لوائح تنفيذية وتنظيمية'
+    WHEN (
+      COALESCE(${alias}.category, '') IN ('إعلان', 'بلاغ', 'بيان', 'تنويه', 'إشعار')
+      OR ${alias}.title LIKE '%إعلان%'
+      OR ${alias}.title LIKE '%بلاغ%'
+      OR ${alias}.title LIKE '%تنويه%'
+    )
+      AND (
+        ${alias}.title LIKE '%شركة%'
+        OR ${alias}.title LIKE '%شركاء%'
+        OR ${alias}.title LIKE '%مساهمة%'
+        OR ${alias}.title LIKE '%ذات مسؤولية محدودة%'
+      )
+      THEN 'إعلانات الشركات'
+    WHEN COALESCE(${alias}.category, '') = 'عقد تأسيس'
+      OR ${alias}.title LIKE '%عقد تأسيس%'
+      OR ${alias}.title LIKE '%تأسيس شركة%'
+      THEN 'الشركات والكيانات التجارية'
+    WHEN COALESCE(${alias}.category, '') IN ('اتفاقية', 'ميثاق', 'مذكرة')
+      OR ${alias}.title LIKE '%اتفاقية%'
+      OR ${alias}.title LIKE '%مذكرة تفاهم%'
+      OR ${alias}.title LIKE '%بروتوكول%'
+      THEN 'اتفاقيات ومعاهدات'
+    WHEN COALESCE(${alias}.category, '') LIKE '%قرار%'
+      OR ${alias}.title LIKE 'قرار %'
+      THEN 'قرارات تنظيمية'
+    WHEN COALESCE(${alias}.category, '') IN ('تعليمات', 'قواعد', 'ضوابط', 'آلية')
+      OR ${alias}.title LIKE '%قواعد%'
+      OR ${alias}.title LIKE '%ضوابط%'
+      OR ${alias}.title LIKE '%تعليمات%'
+      THEN 'قواعد وضوابط'
+    WHEN COALESCE(${alias}.category, '') IN ('بيان', 'إعلان', 'بلاغ', 'تنويه', 'تعميم', 'خبر', 'إشعار')
+      OR ${alias}.title LIKE '%إعلان%'
+      OR ${alias}.title LIKE '%بيان%'
+      OR ${alias}.title LIKE '%بلاغ%'
+      THEN 'إعلانات وبيانات رسمية'
+    WHEN COALESCE(${alias}.category, '') LIKE '%مواصفات قياسية%'
+      OR ${alias}.title LIKE '%مواصفات%'
+      THEN 'مواصفات ومعايير'
+    ELSE 'وثائق رسمية أخرى'
+  END
+`;
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1340,12 +1395,12 @@ export async function registerRoutes(
   // Faceted counts — MUST be before :id route
   app.get("/api/gazette/facets", async (req, res) => {
     try {
-      const categories = await db
-        .select({ category: gazetteIndex.category, count: sql<number>`count(*)` })
-        .from(gazetteIndex)
-        .where(sql`category IS NOT NULL AND category != ''`)
-        .groupBy(gazetteIndex.category)
-        .orderBy(sql`count(*) DESC`);
+      const categories = sqlite.prepare(`
+        SELECT ${saudiGazetteCategoryCaseSql("g")} as category, count(*) as count
+        FROM gazette_index g
+        GROUP BY category
+        ORDER BY count DESC
+      `).all() as { category: string; count: number }[];
 
       const years = await db
         .select({ year: gazetteIndex.issueYear, count: sql<number>`count(*)` })
@@ -1385,7 +1440,7 @@ export async function registerRoutes(
           const filters: string[] = [];
           const params: any[] = [];
 
-          if (category) { filters.push("g.category = ?"); params.push(category); }
+          if (category) { filters.push(`${saudiGazetteCategoryCaseSql("g")} = ?`); params.push(category); }
           if (year) { filters.push("g.issue_year = ?"); params.push(parseInt(year as string)); }
           if (legislationYear) { filters.push("g.legislation_year = ?"); params.push(legislationYear); }
 
@@ -1404,7 +1459,8 @@ export async function registerRoutes(
           const dataStmt = sqlite.prepare(`
             SELECT g.id, g.issue_year as issueYear, g.issue_number as issueNumber,
                    g.title, g.legislation_number as legislationNumber,
-                   g.legislation_year as legislationYear, g.category,
+                   g.legislation_year as legislationYear,
+                   ${saudiGazetteCategoryCaseSql("g")} as category,
                    snippet(gazette_fts, 0, '【', '】', '...', 40) as titleSnippet,
                    bm25(gazette_fts) as rank
             FROM gazette_index g
@@ -1429,34 +1485,34 @@ export async function registerRoutes(
       }
 
       // Non-FTS path
-      const conditions = [];
-      if (category) conditions.push(eq(gazetteIndex.category, category as string));
-      if (year) conditions.push(eq(gazetteIndex.issueYear, parseInt(year as string)));
-      if (legislationYear) conditions.push(eq(gazetteIndex.legislationYear, legislationYear as string));
-      if (q) conditions.push(sql`title LIKE ${`%${q}%`}`);
+      const filters: string[] = [];
+      const params: any[] = [];
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      if (category) { filters.push(`${saudiGazetteCategoryCaseSql("g")} = ?`); params.push(category); }
+      if (year) { filters.push("g.issue_year = ?"); params.push(parseInt(year as string)); }
+      if (legislationYear) { filters.push("g.legislation_year = ?"); params.push(legislationYear); }
+      if (q) { filters.push("g.title LIKE ?"); params.push(`%${q}%`); }
 
-      const results = await db
-        .select({
-          id: gazetteIndex.id,
-          issueYear: gazetteIndex.issueYear,
-          issueNumber: gazetteIndex.issueNumber,
-          title: gazetteIndex.title,
-          legislationNumber: gazetteIndex.legislationNumber,
-          legislationYear: gazetteIndex.legislationYear,
-          category: gazetteIndex.category,
-        })
-        .from(gazetteIndex)
-        .where(whereClause)
-        .orderBy(desc(gazetteIndex.issueYear))
-        .limit(limit)
-        .offset(offset);
+      const whereSql = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
 
-      const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(gazetteIndex)
-        .where(whereClause);
+      const dataStmt = sqlite.prepare(`
+        SELECT g.id, g.issue_year as issueYear, g.issue_number as issueNumber,
+               g.title, g.legislation_number as legislationNumber,
+               g.legislation_year as legislationYear,
+               ${saudiGazetteCategoryCaseSql("g")} as category
+        FROM gazette_index g
+        ${whereSql}
+        ORDER BY g.issue_year DESC
+        LIMIT ? OFFSET ?
+      `);
+      const results = dataStmt.all(...params, limit, offset);
+
+      const countStmt = sqlite.prepare(`
+        SELECT count(*) as count
+        FROM gazette_index g
+        ${whereSql}
+      `);
+      const countResult = countStmt.get(...params) as any;
 
       res.json({
         data: results,
