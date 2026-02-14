@@ -90,6 +90,22 @@ interface SearchStats {
   gazette: { total: number };
 }
 
+interface TrendingSearch {
+  query: string;
+  count: number;
+}
+
+// Fire-and-forget click tracking (non-blocking)
+function trackSearchClick(query: string, resultType: string, resultId: string, position: number) {
+  try {
+    fetch("/api/search/click", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, resultType, resultId, position }),
+    }).catch(() => {});
+  } catch {}
+}
+
 type TabKey = "all" | "laws" | "judgments" | "gazette";
 
 const TABS: { key: TabKey; label: string; shortLabel: string; icon: React.ReactNode }[] = [
@@ -174,6 +190,16 @@ export default function UnifiedSearch() {
       return res.json();
     },
     staleTime: 3600000,
+  });
+
+  // Trending searches (most popular in last 7 days)
+  const { data: trending } = useQuery<TrendingSearch[]>({
+    queryKey: ["search-trending"],
+    queryFn: async () => {
+      const res = await fetch("/api/search/trending");
+      return res.json();
+    },
+    staleTime: 300000, // 5 minutes
   });
 
   // Suggestions query
@@ -507,11 +533,11 @@ export default function UnifiedSearch() {
                 ) : activeTab === "all" ? (
                   <AllResultsView data={data!} onTabChange={handleTabChange} />
                 ) : activeTab === "laws" ? (
-                  <LawResultsView items={data?.results.laws.items || []} total={data?.results.laws.total || 0} page={page} onPageChange={setPage} />
+                  <LawResultsView items={data?.results.laws.items || []} total={data?.results.laws.total || 0} page={page} onPageChange={setPage} query={debouncedQuery} />
                 ) : activeTab === "judgments" ? (
-                  <JudgmentResultsView items={data?.results.judgments.items || []} total={data?.results.judgments.total || 0} page={page} onPageChange={setPage} />
+                  <JudgmentResultsView items={data?.results.judgments.items || []} total={data?.results.judgments.total || 0} page={page} onPageChange={setPage} query={debouncedQuery} />
                 ) : (
-                  <GazetteResultsView items={data?.results.gazette.items || []} total={data?.results.gazette.total || 0} page={page} onPageChange={setPage} />
+                  <GazetteResultsView items={data?.results.gazette.items || []} total={data?.results.gazette.total || 0} page={page} onPageChange={setPage} query={debouncedQuery} />
                 )}
 
                 {/* No Results */}
@@ -553,18 +579,42 @@ export default function UnifiedSearch() {
               ابحث في الأنظمة واللوائح والأحكام القضائية وكشاف أم القرى
             </p>
 
-            {/* Quick search examples */}
-            <div className="flex flex-wrap justify-center gap-2 mb-8">
-              {["نظام العمل", "نظام المعاملات المدنية", "إيجار", "تحكيم تجاري", "ضريبة القيمة المضافة"].map((example) => (
-                <button
-                  key={example}
-                  onClick={() => handleSearch(example)}
-                  className="px-3 py-1.5 rounded-full text-sm bg-muted hover:bg-primary/10 hover:text-primary transition-colors"
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
+            {/* Trending searches - from real user data */}
+            {trending && trending.length > 0 && (
+              <div className="mb-6">
+                <p className="text-xs text-muted-foreground mb-3 flex items-center justify-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                  الأكثر بحثاً هذا الأسبوع
+                </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {trending.slice(0, 8).map((t, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSearch(t.query)}
+                      className="px-3 py-1.5 rounded-full text-sm bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors border border-primary/10 flex items-center gap-1.5"
+                    >
+                      <span>{t.query}</span>
+                      <span className="text-[10px] text-muted-foreground/60">{t.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick search examples (fallback if no trending data yet) */}
+            {(!trending || trending.length === 0) && (
+              <div className="flex flex-wrap justify-center gap-2 mb-8">
+                {["نظام العمل", "نظام المعاملات المدنية", "إيجار", "تحكيم تجاري", "ضريبة القيمة المضافة"].map((example) => (
+                  <button
+                    key={example}
+                    onClick={() => handleSearch(example)}
+                    className="px-3 py-1.5 rounded-full text-sm bg-muted hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Advanced search examples */}
             <div className="max-w-lg mx-auto text-right">
@@ -759,13 +809,13 @@ function AllResultsView({ data, onTabChange }: { data: SearchResult; onTabChange
 
           <div className="space-y-3">
             {section.key === "laws" && (section.items as LawResult[]).slice(0, 3).map((item, i) => (
-              <LawResultCard key={i} item={item} />
+              <LawResultCard key={i} item={item} query={data.query} index={i} />
             ))}
             {section.key === "judgments" && (section.items as JudgmentResult[]).slice(0, 3).map((item, i) => (
-              <JudgmentResultCard key={i} item={item} />
+              <JudgmentResultCard key={i} item={item} query={data.query} index={i} />
             ))}
             {section.key === "gazette" && (section.items as GazetteResult[]).slice(0, 3).map((item, i) => (
-              <GazetteResultCard key={i} item={item} />
+              <GazetteResultCard key={i} item={item} query={data.query} index={i} />
             ))}
           </div>
         </div>
@@ -774,36 +824,36 @@ function AllResultsView({ data, onTabChange }: { data: SearchResult; onTabChange
   );
 }
 
-function LawResultsView({ items, total, page, onPageChange }: { items: LawResult[]; total: number; page: number; onPageChange: (p: number) => void }) {
+function LawResultsView({ items, total, page, onPageChange, query }: { items: LawResult[]; total: number; page: number; onPageChange: (p: number) => void; query?: string }) {
   const totalPages = Math.ceil(total / 15);
   return (
     <div>
       <div className="space-y-3 mb-6">
-        {items.map((item, i) => <LawResultCard key={i} item={item} />)}
+        {items.map((item, i) => <LawResultCard key={i} item={item} query={query} index={i} />)}
       </div>
       {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={onPageChange} />}
     </div>
   );
 }
 
-function JudgmentResultsView({ items, total, page, onPageChange }: { items: JudgmentResult[]; total: number; page: number; onPageChange: (p: number) => void }) {
+function JudgmentResultsView({ items, total, page, onPageChange, query }: { items: JudgmentResult[]; total: number; page: number; onPageChange: (p: number) => void; query?: string }) {
   const totalPages = Math.ceil(total / 15);
   return (
     <div>
       <div className="space-y-3 mb-6">
-        {items.map((item, i) => <JudgmentResultCard key={i} item={item} />)}
+        {items.map((item, i) => <JudgmentResultCard key={i} item={item} query={query} index={i} />)}
       </div>
       {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={onPageChange} />}
     </div>
   );
 }
 
-function GazetteResultsView({ items, total, page, onPageChange }: { items: GazetteResult[]; total: number; page: number; onPageChange: (p: number) => void }) {
+function GazetteResultsView({ items, total, page, onPageChange, query }: { items: GazetteResult[]; total: number; page: number; onPageChange: (p: number) => void; query?: string }) {
   const totalPages = Math.ceil(total / 15);
   return (
     <div>
       <div className="space-y-3 mb-6">
-        {items.map((item, i) => <GazetteResultCard key={i} item={item} />)}
+        {items.map((item, i) => <GazetteResultCard key={i} item={item} query={query} index={i} />)}
       </div>
       {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onChange={onPageChange} />}
     </div>
@@ -812,9 +862,9 @@ function GazetteResultsView({ items, total, page, onPageChange }: { items: Gazet
 
 // Result Cards
 
-function LawResultCard({ item }: { item: LawResult }) {
+function LawResultCard({ item, query, index }: { item: LawResult; query?: string; index?: number }) {
   return (
-    <Link href={`/law/${item.law_id}`}>
+    <Link href={`/law/${item.law_id}`} onClick={() => query && trackSearchClick(query, "laws", item.law_id, index || 0)}>
       <div className="group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer border-r-4 border-r-primary">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -840,10 +890,10 @@ function LawResultCard({ item }: { item: LawResult }) {
   );
 }
 
-function JudgmentResultCard({ item }: { item: JudgmentResult }) {
+function JudgmentResultCard({ item, query, index }: { item: JudgmentResult; query?: string; index?: number }) {
   const isEg = item.source === "eg_naqd";
   return (
-    <Link href={`/judgments/${item.id}`}>
+    <Link href={`/judgments/${item.id}`} onClick={() => query && trackSearchClick(query, "judgments", String(item.id), index || 0)}>
       <div className={`group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer border-r-4 ${
         isEg ? "border-r-accent" : "border-r-primary"
       }`}>
@@ -875,9 +925,9 @@ function JudgmentResultCard({ item }: { item: JudgmentResult }) {
   );
 }
 
-function GazetteResultCard({ item }: { item: GazetteResult }) {
+function GazetteResultCard({ item, query, index }: { item: GazetteResult; query?: string; index?: number }) {
   return (
-    <div className="group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all border-r-4 border-r-primary/50">
+    <div className="group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all border-r-4 border-r-primary/50" onClick={() => query && trackSearchClick(query, "gazette", String(item.id), index || 0)}>
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary shrink-0">
           <Newspaper className="w-5 h-5" />

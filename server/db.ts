@@ -225,4 +225,43 @@ try {
     console.warn("Law articles FTS setup:", e.message);
 }
 
+// ============================================
+// Search Analytics Tables
+// ============================================
+try {
+    // Log every search query with results count
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS search_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query TEXT NOT NULL,
+            query_normalized TEXT NOT NULL,
+            result_count INTEGER DEFAULT 0,
+            result_type TEXT DEFAULT 'all',
+            time_taken INTEGER DEFAULT 0,
+            has_results INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+    `);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS sl_query_idx ON search_logs(query_normalized);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS sl_created_idx ON search_logs(created_at);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS sl_no_results_idx ON search_logs(has_results, created_at);`);
+
+    // Track which result a user clicked after searching
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS search_clicks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query TEXT NOT NULL,
+            result_type TEXT NOT NULL,
+            result_id TEXT NOT NULL,
+            result_position INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+    `);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS sc_query_idx ON search_clicks(query);`);
+
+    console.log("Search analytics tables ready.");
+} catch (e: any) {
+    console.warn("Search analytics setup:", e.message);
+}
+
 console.log(`Database connected: ${dbPath}`);

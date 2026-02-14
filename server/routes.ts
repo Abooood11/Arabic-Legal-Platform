@@ -475,6 +475,15 @@ export async function registerRoutes(
       // Parse advanced query info for frontend display
       const parsedInfo = parseAdvancedQuery(q);
 
+      // Log search to analytics (async, non-blocking)
+      try {
+        const normalized = q.trim().replace(/\s+/g, " ").toLowerCase();
+        sqlite.prepare(`
+          INSERT INTO search_logs (query, query_normalized, result_count, result_type, time_taken, has_results)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(q, normalized, totalResults, type, timeTaken, totalResults > 0 ? 1 : 0);
+      } catch {}
+
       res.set("Cache-Control", "public, max-age=60");
       res.json({
         query: q,
@@ -575,6 +584,141 @@ export async function registerRoutes(
       });
     } catch {
       res.json({ totalDocuments: 0, laws: { articles: 0, laws: 0 }, judgments: { total: 0 }, gazette: { total: 0 } });
+    }
+  });
+
+  // ============================================
+  // Search Analytics APIs
+  // ============================================
+
+  // Track result clicks (called when user clicks a search result)
+  app.post("/api/search/click", async (req, res) => {
+    try {
+      const { query, resultType, resultId, position } = req.body;
+      if (!query || !resultType || !resultId) return res.status(400).json({ error: "Missing fields" });
+      sqlite.prepare(`
+        INSERT INTO search_clicks (query, result_type, result_id, result_position)
+        VALUES (?, ?, ?, ?)
+      `).run(query, resultType, String(resultId), position || 0);
+      res.json({ ok: true });
+    } catch {
+      res.json({ ok: false });
+    }
+  });
+
+  // Trending searches (most popular queries in last 7 days)
+  app.get("/api/search/trending", async (req, res) => {
+    try {
+      const trending = sqlite.prepare(`
+        SELECT query_normalized as query, count(*) as count
+        FROM search_logs
+        WHERE created_at >= datetime('now', '-7 days')
+          AND has_results = 1
+          AND length(query_normalized) >= 3
+        GROUP BY query_normalized
+        ORDER BY count DESC
+        LIMIT 10
+      `).all() as any[];
+
+      res.set("Cache-Control", "public, max-age=300");
+      res.json(trending);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  // Failed searches (queries with zero results - what users couldn't find)
+  app.get("/api/search/failed", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const failed = sqlite.prepare(`
+        SELECT query_normalized as query, count(*) as count, MAX(created_at) as lastSearched
+        FROM search_logs
+        WHERE has_results = 0
+          AND created_at >= datetime('now', '-' || ? || ' days')
+          AND length(query_normalized) >= 2
+        GROUP BY query_normalized
+        ORDER BY count DESC
+        LIMIT 50
+      `).all(days) as any[];
+
+      res.json(failed);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  // Search analytics dashboard (admin only)
+  app.get("/api/search/analytics", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+
+      // Total searches
+      const totalSearches = (sqlite.prepare(`
+        SELECT count(*) as cnt FROM search_logs WHERE created_at >= datetime('now', '-' || ? || ' days')
+      `).get(days) as any)?.cnt || 0;
+
+      // Unique queries
+      const uniqueQueries = (sqlite.prepare(`
+        SELECT count(DISTINCT query_normalized) as cnt FROM search_logs WHERE created_at >= datetime('now', '-' || ? || ' days')
+      `).get(days) as any)?.cnt || 0;
+
+      // Zero-result rate
+      const zeroResults = (sqlite.prepare(`
+        SELECT count(*) as cnt FROM search_logs WHERE has_results = 0 AND created_at >= datetime('now', '-' || ? || ' days')
+      `).get(days) as any)?.cnt || 0;
+
+      // Average response time
+      const avgTime = (sqlite.prepare(`
+        SELECT AVG(time_taken) as avg FROM search_logs WHERE created_at >= datetime('now', '-' || ? || ' days')
+      `).get(days) as any)?.avg || 0;
+
+      // Top queries
+      const topQueries = sqlite.prepare(`
+        SELECT query_normalized as query, count(*) as count,
+               AVG(result_count) as avgResults,
+               SUM(CASE WHEN has_results = 0 THEN 1 ELSE 0 END) as failCount
+        FROM search_logs
+        WHERE created_at >= datetime('now', '-' || ? || ' days')
+        GROUP BY query_normalized
+        ORDER BY count DESC
+        LIMIT 20
+      `).all(days) as any[];
+
+      // Top clicked results
+      const topClicked = sqlite.prepare(`
+        SELECT result_type, result_id, query, count(*) as clicks
+        FROM search_clicks
+        WHERE created_at >= datetime('now', '-' || ? || ' days')
+        GROUP BY result_type, result_id
+        ORDER BY clicks DESC
+        LIMIT 20
+      `).all(days) as any[];
+
+      // Searches per day trend
+      const dailyTrend = sqlite.prepare(`
+        SELECT date(created_at) as day, count(*) as searches,
+               SUM(CASE WHEN has_results = 0 THEN 1 ELSE 0 END) as failed
+        FROM search_logs
+        WHERE created_at >= datetime('now', '-' || ? || ' days')
+        GROUP BY date(created_at)
+        ORDER BY day DESC
+      `).all(days) as any[];
+
+      res.json({
+        period: days,
+        totalSearches,
+        uniqueQueries,
+        zeroResultRate: totalSearches > 0 ? Math.round((zeroResults / totalSearches) * 100) : 0,
+        avgResponseTime: Math.round(avgTime),
+        topQueries,
+        topClicked,
+        dailyTrend,
+        failedSearchCount: zeroResults,
+      });
+    } catch (err: any) {
+      console.error("Analytics error:", err);
+      res.status(500).json({ error: "Failed to load analytics" });
     }
   });
 
