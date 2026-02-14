@@ -262,6 +262,17 @@ export function setupAuthSchema() {
   try { sqlite.exec("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local'"); } catch {}
   // Make password optional for OAuth users
   try { sqlite.exec("CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)"); } catch {}
+
+  // Promote existing users in ADMIN_EMAILS to admin role on startup
+  if (ADMIN_EMAILS.length > 0) {
+    const placeholders = ADMIN_EMAILS.map(() => "?").join(",");
+    sqlite.prepare(`
+      UPDATE app_users SET role = 'admin'
+      WHERE user_id IN (
+        SELECT id FROM users WHERE LOWER(email) IN (${placeholders})
+      )
+    `).run(...ADMIN_EMAILS);
+  }
 }
 
 export function registerAuthRoutes(app: Express) {
