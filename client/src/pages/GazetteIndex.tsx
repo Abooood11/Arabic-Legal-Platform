@@ -25,13 +25,6 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from "@/components/ui/sheet";
 
 interface GazetteItem {
     id: number;
@@ -155,8 +148,8 @@ export default function GazetteIndex() {
         staleTime: 120000,
     });
 
-    const hasFilters = categoryFilter || yearFilter || legYearFilter;
-    const clearFilters = () => { setCategoryFilter(""); setYearFilter(""); setLegYearFilter(""); };
+    const hasFilters = categoryFilter || yearFilter;
+    const clearFilters = () => { setCategoryFilter(""); setYearFilter(""); };
     const isSearching = !!debouncedSearch;
 
     return (
@@ -248,71 +241,15 @@ export default function GazetteIndex() {
             <div className="border-b bg-background sticky top-16 z-20">
                 <div className="container mx-auto px-4">
                     <div className="flex items-center gap-2 py-2">
-                        <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
-                            <SheetTrigger asChild>
-                                <Button variant={hasFilters ? "default" : "outline"} size="sm" className="gap-1.5">
-                                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                                    تصفية
-                                    {hasFilters && (
-                                        <span className="bg-white/20 text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
-                                            {[categoryFilter, yearFilter, legYearFilter].filter(Boolean).length}
-                                        </span>
-                                    )}
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent side="right" className="w-80">
-                                <SheetHeader>
-                                    <SheetTitle>تصفية الكشاف</SheetTitle>
-                                </SheetHeader>
-                                <div className="mt-6 space-y-6">
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">التصنيف النوعي</label>
-                                        <Select value={categoryFilter || "__all__"} onValueChange={(v) => setCategoryFilter(v === "__all__" ? "" : v)}>
-                                            <SelectTrigger><SelectValue placeholder="جميع التصنيفات" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__all__">جميع التصنيفات</SelectItem>
-                                                {facets?.categories?.map((c) => (
-                                                    <SelectItem key={c.category} value={c.category}>
-                                                        {c.category} ({c.count.toLocaleString("en")})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">سنة الإصدار (العدد)</label>
-                                        <Select value={yearFilter || "__all__"} onValueChange={(v) => setYearFilter(v === "__all__" ? "" : v)}>
-                                            <SelectTrigger><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__all__">جميع السنوات</SelectItem>
-                                                {facets?.years?.map((y) => (
-                                                    <SelectItem key={y.year} value={y.year.toString()}>
-                                                        {y.year} ({y.count.toLocaleString("en")})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">سنة التشريع</label>
-                                        <Select value={legYearFilter || "__all__"} onValueChange={(v) => setLegYearFilter(v === "__all__" ? "" : v)}>
-                                            <SelectTrigger><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__all__">جميع السنوات</SelectItem>
-                                                {facets?.legislationYears?.map((y) => (
-                                                    <SelectItem key={y.year} value={y.year}>
-                                                        {y.year} ({y.count.toLocaleString("en")})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {hasFilters && (
-                                        <Button variant="outline" onClick={clearFilters} className="w-full">مسح الفلاتر</Button>
-                                    )}
-                                </div>
-                            </SheetContent>
-                        </Sheet>
+                        <Button variant={hasFilters ? "default" : "outline"} size="sm" className="gap-1.5" onClick={() => setFilterOpen(!filterOpen)}>
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                            تصفية
+                            {hasFilters && (
+                                <span className="bg-white/20 text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
+                                    {[categoryFilter, yearFilter].filter(Boolean).length}
+                                </span>
+                            )}
+                        </Button>
 
                         {/* Active Filters Pills */}
                         {hasFilters && (
@@ -328,11 +265,6 @@ export default function GazetteIndex() {
                                         سنة {yearFilter} <X className="h-3 w-3" />
                                     </Badge>
                                 )}
-                                {legYearFilter && (
-                                    <Badge variant="secondary" className="gap-1 text-xs cursor-pointer" onClick={() => setLegYearFilter("")}>
-                                        تشريع {legYearFilter} <X className="h-3 w-3" />
-                                    </Badge>
-                                )}
                             </div>
                         )}
 
@@ -346,6 +278,68 @@ export default function GazetteIndex() {
                         )}
                     </div>
                 </div>
+
+                {/* Inline Filter Panel */}
+                {filterOpen && (
+                    <div className="border-t border-primary/10 bg-gradient-to-b from-primary/[0.03] to-background">
+                        <div className="container mx-auto px-4 py-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-primary/10 p-1.5 rounded-lg">
+                                        <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                                    </div>
+                                    <span className="font-semibold text-sm text-primary">تصفية الكشاف</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {hasFilters && (
+                                        <button onClick={clearFilters} className="text-xs text-primary/70 hover:text-primary transition-colors">
+                                            مسح الكل
+                                        </button>
+                                    )}
+                                    <button onClick={() => setFilterOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-medium mb-1.5 block text-muted-foreground flex items-center gap-1.5">
+                                        <Tag className="h-3 w-3" />
+                                        التصنيف النوعي
+                                    </label>
+                                    <Select value={categoryFilter || "__all__"} onValueChange={(v) => setCategoryFilter(v === "__all__" ? "" : v)}>
+                                        <SelectTrigger className="h-9 text-sm rounded-lg"><SelectValue placeholder="جميع التصنيفات" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__all__">جميع التصنيفات</SelectItem>
+                                            {facets?.categories?.map((c) => (
+                                                <SelectItem key={c.category} value={c.category}>
+                                                    {c.category} ({c.count.toLocaleString("en")})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium mb-1.5 block text-muted-foreground flex items-center gap-1.5">
+                                        <Calendar className="h-3 w-3" />
+                                        سنة الإصدار (العدد)
+                                    </label>
+                                    <Select value={yearFilter || "__all__"} onValueChange={(v) => setYearFilter(v === "__all__" ? "" : v)}>
+                                        <SelectTrigger className="h-9 text-sm rounded-lg"><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__all__">جميع السنوات</SelectItem>
+                                            {facets?.years?.map((y) => (
+                                                <SelectItem key={y.year} value={y.year.toString()}>
+                                                    {y.year} ({y.count.toLocaleString("en")})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Results */}

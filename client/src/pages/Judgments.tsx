@@ -33,13 +33,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { fixArabicDate } from "@/lib/judgment-parser";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from "@/components/ui/sheet";
 
 interface JudgmentListItem {
     id: number;
@@ -355,69 +348,15 @@ export default function Judgments() {
                         <div className="flex-grow" />
 
                         {/* Filters + Sort */}
-                        <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
-                            <SheetTrigger asChild>
-                                <Button variant={hasFilters ? "default" : "outline"} size="sm" className="gap-1.5">
-                                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                                    تصفية
-                                    {hasFilters && (
-                                        <span className="bg-white/20 text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
-                                            {[cityFilter, courtFilter, yearFilter].filter(Boolean).length}
-                                        </span>
-                                    )}
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent side="right" className="w-80">
-                                <SheetHeader>
-                                    <SheetTitle>تصفية الأحكام</SheetTitle>
-                                </SheetHeader>
-                                <div className="mt-6 space-y-6">
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">المدينة</label>
-                                        <Select value={cityFilter || "__all__"} onValueChange={(v) => setCityFilter(v === "__all__" ? "" : v)}>
-                                            <SelectTrigger><SelectValue placeholder="جميع المدن" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__all__">جميع المدن</SelectItem>
-                                                {facets?.cities?.map((c) => (
-                                                    <SelectItem key={c.city} value={c.city}>{c.city} ({c.count})</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">المحكمة</label>
-                                        <Select value={courtFilter || "__all__"} onValueChange={(v) => setCourtFilter(v === "__all__" ? "" : v)}>
-                                            <SelectTrigger><SelectValue placeholder="جميع المحاكم" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__all__">جميع المحاكم</SelectItem>
-                                                {facets?.courts?.slice(0, 20).map((c) => (
-                                                    <SelectItem key={c.court} value={c.court}>{c.court} ({c.count})</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">
-                                            {activeTab === "eg_naqd" ? "السنة القضائية" : "السنة"}
-                                        </label>
-                                        <Select value={yearFilter || "__all__"} onValueChange={(v) => setYearFilter(v === "__all__" ? "" : v)}>
-                                            <SelectTrigger><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__all__">جميع السنوات</SelectItem>
-                                                {facets?.years?.map((y) => (
-                                                    <SelectItem key={y.year} value={y.year.toString()}>
-                                                        {y.year}{activeTab === "eg_naqd" ? "" : "هـ"} ({y.count})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {hasFilters && (
-                                        <Button variant="outline" onClick={clearFilters} className="w-full">مسح الفلاتر</Button>
-                                    )}
-                                </div>
-                            </SheetContent>
-                        </Sheet>
+                        <Button variant={hasFilters ? "default" : "outline"} size="sm" className="gap-1.5" onClick={() => setFilterOpen(!filterOpen)}>
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                            تصفية
+                            {hasFilters && (
+                                <span className="bg-white/20 text-[10px] rounded-full h-4 w-4 flex items-center justify-center">
+                                    {[cityFilter, courtFilter, yearFilter].filter(Boolean).length}
+                                </span>
+                            )}
+                        </Button>
 
                         <Select value={sort} onValueChange={setSort}>
                             <SelectTrigger className="w-28 h-9 text-xs">
@@ -432,6 +371,81 @@ export default function Judgments() {
                         </Select>
                     </div>
                 </div>
+
+                {/* Inline Filter Panel */}
+                {filterOpen && (
+                    <div className="border-t border-primary/10 bg-gradient-to-b from-primary/[0.03] to-background">
+                        <div className="container mx-auto px-4 py-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-primary/10 p-1.5 rounded-lg">
+                                        <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                                    </div>
+                                    <span className="font-semibold text-sm text-primary">تصفية الأحكام</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {hasFilters && (
+                                        <button onClick={clearFilters} className="text-xs text-primary/70 hover:text-primary transition-colors">
+                                            مسح الكل
+                                        </button>
+                                    )}
+                                    <button onClick={() => setFilterOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="text-xs font-medium mb-1.5 block text-muted-foreground flex items-center gap-1.5">
+                                        <MapPin className="h-3 w-3" />
+                                        المدينة
+                                    </label>
+                                    <Select value={cityFilter || "__all__"} onValueChange={(v) => setCityFilter(v === "__all__" ? "" : v)}>
+                                        <SelectTrigger className="h-9 text-sm rounded-lg"><SelectValue placeholder="جميع المدن" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__all__">جميع المدن</SelectItem>
+                                            {facets?.cities?.map((c) => (
+                                                <SelectItem key={c.city} value={c.city}>{c.city} ({c.count})</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium mb-1.5 block text-muted-foreground flex items-center gap-1.5">
+                                        <Building2 className="h-3 w-3" />
+                                        المحكمة
+                                    </label>
+                                    <Select value={courtFilter || "__all__"} onValueChange={(v) => setCourtFilter(v === "__all__" ? "" : v)}>
+                                        <SelectTrigger className="h-9 text-sm rounded-lg"><SelectValue placeholder="جميع المحاكم" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__all__">جميع المحاكم</SelectItem>
+                                            {facets?.courts?.slice(0, 20).map((c) => (
+                                                <SelectItem key={c.court} value={c.court}>{c.court} ({c.count})</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium mb-1.5 block text-muted-foreground flex items-center gap-1.5">
+                                        <Calendar className="h-3 w-3" />
+                                        {activeTab === "eg_naqd" ? "السنة القضائية" : "السنة"}
+                                    </label>
+                                    <Select value={yearFilter || "__all__"} onValueChange={(v) => setYearFilter(v === "__all__" ? "" : v)}>
+                                        <SelectTrigger className="h-9 text-sm rounded-lg"><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__all__">جميع السنوات</SelectItem>
+                                            {facets?.years?.map((y) => (
+                                                <SelectItem key={y.year} value={y.year.toString()}>
+                                                    {y.year}{activeTab === "eg_naqd" ? "" : "هـ"} ({y.count})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Active Filters Pills */}
