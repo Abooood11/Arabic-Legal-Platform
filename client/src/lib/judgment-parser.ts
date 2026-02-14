@@ -380,8 +380,9 @@ export function formatJudgmentText(text: string): string {
         f = f.replace(p, "$1\n");
     }
 
-    // Collapse excessive whitespace
-    f = f.replace(/\n{3,}/g, "\n\n");
+    // Collapse excessive whitespace: reduce any 2+ newlines to a single newline
+    // so paragraphs are separated by one line break, not a blank line gap.
+    f = f.replace(/\n{2,}/g, "\n");
 
     return f;
 }
@@ -534,6 +535,7 @@ export function parseBogMetadata(text: string, source?: string, caseId?: string,
     if (!text || (source !== "bog_judicial")) return null;
 
     // Find where الوقائع section starts (the actual judgment body)
+    // Also match OCR-corrupted variants that stripPdfBookArtifacts will fix
     const waqaeiPatterns = [
         /^#{0,3}\s*الوقائع\s*$/m,
         /^الوقائع\s*$/m,
@@ -558,6 +560,16 @@ export function parseBogMetadata(text: string, source?: string, caseId?: string,
         }
     }
 
+    // If still no section found, try locating الوقائع content start (تتحصل/تتلخص/etc.)
+    // preceded by a short standalone line (corrupted الوقائع header)
+    if (bodyStart < 100) {
+        const contentStartMatch = text.match(/\n\s*\n.{2,50}\n\s*\n(تتحصل|تتلخص|تخلص|حيث إن الوقائع|تتمثل وقائع|وقائع ال)/);
+        if (contentStartMatch && contentStartMatch.index !== undefined) {
+            // Point to the corrupted header line before the content
+            bodyStart = contentStartMatch.index + 1;
+        }
+    }
+
     // If still no section found, no metadata to extract
     if (bodyStart < 100) return null;
 
@@ -579,9 +591,12 @@ export function parseBogMetadata(text: string, source?: string, caseId?: string,
             { re: /^رقم القضية في محكمة الاستئناف الإدارية\s+(.+)/, label: "رقم القضية في محكمة الاستئناف" },
             { re: /^رقم الاستئناف\s+(.+)/, label: "رقم الاستئناف" },
             { re: /^رقم الاعتراض\s+(.+)/, label: "رقم الاعتراض" },
-            { re: /^تاريخ الجلسة\s+(.+)/, label: "تاريخ الجلسة" },
+            { re: /^تاريخ الجلسة\s*:?\s+(.+)/, label: "تاريخ الجلسة" },
+            { re: /^رقم القضية الابتدائية\s*:?\s+(.+)/, label: "رقم القضية الابتدائية" },
+            { re: /^رقم الحكم الابتدائي\s*:?\s+(.+)/, label: "رقم الحكم الابتدائي" },
+            { re: /^رقم قضية الاستئناف\s*:?\s+(.+)/, label: "رقم قضية الاستئناف" },
+            { re: /^رقم حكم الاستئناف\s*:?\s+(.+)/, label: "رقم حكم الاستئناف" },
             { re: /^رقم القضية:?\s+(.+)/, label: "رقم القضية" },
-            { re: /^رقم الحكم الابتدائي:?\s+(.+)/, label: "رقم الحكم الابتدائي" },
             { re: /^القضية رقم:?\s+(.+)/, label: "رقم القضية" },
             { re: /^الحكم الابتدائي رقم:?\s+(.+)/, label: "الحكم الابتدائي" },
         ];

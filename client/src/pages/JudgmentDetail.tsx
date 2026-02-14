@@ -324,6 +324,21 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
             }
         }
 
+        // Remove duplicate section label at start of text segments following a divider
+        // (e.g. stripPdfBookArtifacts inserts "الأسباب" which the divider also renders)
+        for (let i = 1; i < result.length; i++) {
+            if (result[i].type === "text" && result[i - 1].type === "divider" && result[i - 1].config) {
+                const label = result[i - 1].config!.label;
+                const stripped = result[i].content.replace(new RegExp(`^\\s*${label}\\s*`), '').trim();
+                if (stripped) {
+                    result[i].content = stripped;
+                } else {
+                    result.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
         return result;
     }, [text]);
 
@@ -332,7 +347,7 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
             {segments.map((seg, i) => {
                 if (seg.type === "divider" && seg.config) {
                     return (
-                        <div key={i} className="mt-10 mb-5 flex items-center gap-4">
+                        <div key={i} className="mt-6 mb-3 flex items-center gap-4">
                             <div className={`h-px flex-1 border-t ${seg.config.border}`} />
                             <div className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold ${seg.config.color} ${seg.config.bg} border ${seg.config.border} shadow-sm`}>
                                 <span className="w-2 h-2 rounded-full bg-current" />
@@ -353,7 +368,7 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
                     || /^حرر(?:ت)? (?:هذا|هذه|في)/.test(seg.content.trim());
 
                 return (
-                    <div key={i} className={`judgment-text leading-[2] whitespace-pre-line ${isClosing ? 'text-center text-muted-foreground mt-8' : 'text-justify'}`} dir="rtl">
+                    <div key={i} className={`judgment-text leading-[1.75] whitespace-pre-line ${isClosing ? 'text-center text-muted-foreground mt-6' : 'text-justify'}`} dir="rtl">
                         <HighlightedChunk
                             text={formatted}
                             tokens={tokens}
