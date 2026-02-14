@@ -68,6 +68,61 @@ const saudiGazetteCategoryCaseSql = (alias: string) => `
   END
 `;
 
+const saudiGazetteCategoryCaseSql = (alias: string) => `
+  CASE
+    WHEN COALESCE(${alias}.category, '') LIKE '%مرسوم ملكي%' THEN 'مراسيم ملكية'
+    WHEN COALESCE(${alias}.category, '') LIKE '%أمر ملكي%' OR COALESCE(${alias}.category, '') LIKE '%أمر سام%' THEN 'أوامر ملكية وسامية'
+    WHEN COALESCE(${alias}.category, '') LIKE '%قرار مجلس الوزراء%' THEN 'قرارات مجلس الوزراء'
+    WHEN COALESCE(${alias}.category, '') IN ('نظام', 'نظام أساسي', 'قانون')
+      OR ${alias}.title LIKE '%نظام %'
+      OR ${alias}.title LIKE 'نظام%'
+      THEN 'أنظمة'
+    WHEN COALESCE(${alias}.category, '') LIKE '%لائحة%'
+      OR ${alias}.title LIKE '%اللائحة%'
+      OR ${alias}.title LIKE '%لائحة%'
+      THEN 'لوائح تنفيذية وتنظيمية'
+    WHEN (
+      COALESCE(${alias}.category, '') IN ('إعلان', 'بلاغ', 'بيان', 'تنويه', 'إشعار')
+      OR ${alias}.title LIKE '%إعلان%'
+      OR ${alias}.title LIKE '%بلاغ%'
+      OR ${alias}.title LIKE '%تنويه%'
+    )
+      AND (
+        ${alias}.title LIKE '%شركة%'
+        OR ${alias}.title LIKE '%شركاء%'
+        OR ${alias}.title LIKE '%مساهمة%'
+        OR ${alias}.title LIKE '%ذات مسؤولية محدودة%'
+      )
+      THEN 'إعلانات الشركات'
+    WHEN COALESCE(${alias}.category, '') = 'عقد تأسيس'
+      OR ${alias}.title LIKE '%عقد تأسيس%'
+      OR ${alias}.title LIKE '%تأسيس شركة%'
+      THEN 'الشركات والكيانات التجارية'
+    WHEN COALESCE(${alias}.category, '') IN ('اتفاقية', 'ميثاق', 'مذكرة')
+      OR ${alias}.title LIKE '%اتفاقية%'
+      OR ${alias}.title LIKE '%مذكرة تفاهم%'
+      OR ${alias}.title LIKE '%بروتوكول%'
+      THEN 'اتفاقيات ومعاهدات'
+    WHEN COALESCE(${alias}.category, '') LIKE '%قرار%'
+      OR ${alias}.title LIKE 'قرار %'
+      THEN 'قرارات تنظيمية'
+    WHEN COALESCE(${alias}.category, '') IN ('تعليمات', 'قواعد', 'ضوابط', 'آلية')
+      OR ${alias}.title LIKE '%قواعد%'
+      OR ${alias}.title LIKE '%ضوابط%'
+      OR ${alias}.title LIKE '%تعليمات%'
+      THEN 'قواعد وضوابط'
+    WHEN COALESCE(${alias}.category, '') IN ('بيان', 'إعلان', 'بلاغ', 'تنويه', 'تعميم', 'خبر', 'إشعار')
+      OR ${alias}.title LIKE '%إعلان%'
+      OR ${alias}.title LIKE '%بيان%'
+      OR ${alias}.title LIKE '%بلاغ%'
+      THEN 'إعلانات وبيانات رسمية'
+    WHEN COALESCE(${alias}.category, '') LIKE '%مواصفات قياسية%'
+      OR ${alias}.title LIKE '%مواصفات%'
+      THEN 'مواصفات ومعايير'
+    ELSE 'وثائق رسمية أخرى'
+  END
+`;
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
