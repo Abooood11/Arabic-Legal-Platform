@@ -183,6 +183,14 @@ export const isAdmin: RequestHandler = (req, res, next) => {
 };
 
 export function setupAuthSchema() {
+  // Migrate old sessions table if schema mismatch (expired→expire)
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(sessions)").all() as any[];
+    if (cols.length > 0 && !cols.some((c: any) => c.name === "expire")) {
+      sqlite.exec("DROP TABLE sessions;");
+    }
+  } catch {}
+
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
