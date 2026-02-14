@@ -22,6 +22,7 @@ import {
     Hash,
     FileText,
     BookOpen,
+    ExternalLink,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +35,7 @@ interface GazetteItem {
     legislationNumber: string | null;
     legislationYear: string | null;
     category: string | null;
+    issuePdfUrl?: string | null;
     titleSnippet?: string;
 }
 
@@ -398,6 +400,17 @@ export default function GazetteIndex() {
                                                 <BookOpen className="h-3 w-3" />
                                                 سنة {item.legislationYear}
                                             </span>
+                                        )}
+                                        {item.issuePdfUrl && (
+                                            <a
+                                                href={item.issuePdfUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                                            >
+                                                <ExternalLink className="h-3 w-3" />
+                                                PDF العدد
+                                            </a>
                                         )}
                                     </div>
                                 </div>
