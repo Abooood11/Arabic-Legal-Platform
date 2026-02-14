@@ -10,6 +10,8 @@ data.db
 data.db-shm
 data.db-wal
 data.db.gz
+data_backup_pre_fixes.db
+*_backup*.db
 nul
 test_*.json
 folder1_*.json
