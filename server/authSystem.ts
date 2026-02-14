@@ -198,6 +198,8 @@ export function setupAuthSchema() {
       first_name TEXT,
       last_name TEXT,
       profile_image_url TEXT,
+      google_id TEXT UNIQUE,
+      auth_provider TEXT DEFAULT 'local',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -254,6 +256,12 @@ export function setupAuthSchema() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  // Migration: add google_id and auth_provider columns if missing
+  try { sqlite.exec("ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE"); } catch {}
+  try { sqlite.exec("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local'"); } catch {}
+  // Make password optional for OAuth users
+  try { sqlite.exec("CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)"); } catch {}
 }
 
 export function registerAuthRoutes(app: Express) {
@@ -359,5 +367,152 @@ export function registerAuthRoutes(app: Express) {
       FROM app_users WHERE user_id = ?
     `).get(userId);
     res.json({ subscription: data });
+  });
+
+  // ============================================
+  // Google OAuth 2.0
+  // ============================================
+  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+  const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
+
+  function getGoogleRedirectUri(req: Request) {
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+    const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost:3005";
+    return `${proto}://${host}/api/auth/google/callback`;
+  }
+
+  // Step 1: Redirect user to Google consent screen
+  app.get("/api/auth/google", (req, res) => {
+    if (!GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ message: "Google OAuth not configured" });
+    }
+
+    const state = randomToken(32);
+    // Store state in a short-lived cookie for CSRF protection
+    setCookie(res, "google_oauth_state", state, 600); // 10 minutes
+
+    const redirectUri = getGoogleRedirectUri(req);
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+      access_type: "offline",
+      prompt: "select_account",
+    });
+
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  });
+
+  // Step 2: Handle Google callback
+  app.get("/api/auth/google/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+
+      if (!code || !state) {
+        return res.redirect("/auth?error=missing_params");
+      }
+
+      // Verify CSRF state
+      const cookies = parseCookies(req);
+      const savedState = cookies["google_oauth_state"];
+      if (!savedState || savedState !== state) {
+        return res.redirect("/auth?error=invalid_state");
+      }
+      clearCookie(res, "google_oauth_state");
+
+      const redirectUri = getGoogleRedirectUri(req);
+
+      // Exchange code for tokens
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code: code as string,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code",
+        }),
+      });
+
+      const tokenData = await tokenRes.json() as any;
+      if (!tokenRes.ok || !tokenData.access_token) {
+        console.error("Google token error:", tokenData);
+        return res.redirect("/auth?error=token_exchange");
+      }
+
+      // Get user profile from Google
+      const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+
+      const profile = await profileRes.json() as any;
+      if (!profileRes.ok || !profile.email) {
+        console.error("Google profile error:", profile);
+        return res.redirect("/auth?error=profile_fetch");
+      }
+
+      const googleId = String(profile.id);
+      const email = String(profile.email).toLowerCase();
+      const firstName = profile.given_name || profile.name?.split(" ")[0] || "";
+      const lastName = profile.family_name || "";
+      const profileImage = profile.picture || "";
+
+      // Check if user exists by google_id
+      let existingUser = sqlite.prepare("SELECT u.id, a.role FROM users u JOIN app_users a ON a.user_id = u.id WHERE u.google_id = ?").get(googleId) as any;
+
+      if (!existingUser) {
+        // Check if user exists by email (might have registered with email/password before)
+        existingUser = sqlite.prepare("SELECT u.id, a.role FROM users u JOIN app_users a ON a.user_id = u.id WHERE u.email = ?").get(email) as any;
+
+        if (existingUser) {
+          // Link Google to existing account
+          sqlite.prepare("UPDATE users SET google_id = ?, profile_image_url = COALESCE(profile_image_url, ?), updated_at = datetime('now') WHERE id = ?")
+            .run(googleId, profileImage || null, existingUser.id);
+        } else {
+          // Create new user (Google OAuth - no password needed)
+          const userId = crypto.randomUUID();
+          const role = ADMIN_EMAILS.includes(email) ? "admin" : "user";
+
+          sqlite.prepare("INSERT INTO users (id, email, first_name, last_name, profile_image_url, google_id, auth_provider, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'google', datetime('now'), datetime('now'))")
+            .run(userId, email, firstName || null, lastName || null, profileImage || null, googleId);
+
+          // Create app_users with placeholder password (not usable for login)
+          const { hash, salt } = hashPassword(randomToken(32));
+          sqlite.prepare("INSERT INTO app_users (user_id, password_hash, password_salt, role, subscription_tier, subscription_status) VALUES (?, ?, ?, ?, 'free', 'inactive')")
+            .run(userId, hash, salt, role);
+
+          existingUser = { id: userId, role };
+        }
+      } else {
+        // Update profile image on each login
+        sqlite.prepare("UPDATE users SET profile_image_url = COALESCE(?, profile_image_url), updated_at = datetime('now') WHERE id = ?")
+          .run(profileImage || null, existingUser.id);
+      }
+
+      // Update last login
+      sqlite.prepare("UPDATE app_users SET last_login_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ?").run(existingUser.id);
+
+      // Audit log
+      sqlite.prepare("INSERT INTO login_audit_logs (email, user_id, action, success, ip_address, user_agent) VALUES (?, ?, 'google_login', 1, ?, ?)")
+        .run(email, existingUser.id, req.ip || null, (req.headers["user-agent"] as string) || null);
+
+      // Issue JWT tokens (same as regular login)
+      issueTokens(res, { id: existingUser.id, role: existingUser.role }, req.headers["user-agent"] as string, req.ip);
+
+      // Redirect to library page
+      res.redirect("/library");
+
+    } catch (error: any) {
+      console.error("Google OAuth error:", error);
+      res.redirect("/auth?error=server_error");
+    }
+  });
+
+  // API to check if Google OAuth is configured
+  app.get("/api/auth/google/status", (_req, res) => {
+    res.json({ enabled: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) });
   });
 }
