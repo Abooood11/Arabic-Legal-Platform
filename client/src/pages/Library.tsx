@@ -12,8 +12,17 @@ const CATEGORIES = [
   { value: "law", label: "أنظمة" },
   { value: "regulation", label: "لوائح" },
   { value: "decision", label: "قرارات" },
-  { value: "gazette", label: "جريدة رسمية" },
+  { value: "gazette", label: "كشاف أم القرى" },
   { value: "guide", label: "أدلة" },
+];
+
+const SAUDI_LEGAL_FORMS = [
+  { value: "all", label: "الكل" },
+  { value: "nizam", label: "نظام" },
+  { value: "laiha", label: "لائحة" },
+  { value: "qarar", label: "قرار" },
+  { value: "ittifaq", label: "اتفاقية" },
+  { value: "tanzim", label: "تنظيم" },
 ];
 
 const SOURCES = [
@@ -27,36 +36,54 @@ const CATEGORY_LABELS: Record<string, string> = {
   law: "نظام",
   regulation: "لائحة",
   decision: "قرار",
-  gazette: "جريدة رسمية",
+  gazette: "كشاف أم القرى",
   guide: "دليل",
 };
 
+const SAUDI_FORM_LABELS: Record<string, string> = {
+  nizam: "نظام",
+  laiha: "لائحة",
+  qarar: "قرار",
+  ittifaq: "اتفاقية",
+  tanzim: "تنظيم",
+};
+
 const ITEMS_PER_PAGE = 30;
+
+function classifySaudiForm(item: { category?: string; title_ar?: string }) {
+  const title = item.title_ar || "";
+
+  if (/(اتفاقية|معاهدة|مذكرة تفاهم|ميثاق|بروتوكول)/.test(title)) return "ittifaq";
+  if (item.category === "regulation" || /(اللائحة|لائحة)/.test(title)) return "laiha";
+  if (item.category === "law" || /(نظام|نظام أساسي|قانون)/.test(title)) return "nizam";
+  if (item.category === "decision" || /(^قرار|قرار\s)/.test(title)) return "qarar";
+  if (/(تنظيم|ترتيبات تنظيمية)/.test(title)) return "tanzim";
+
+  return "qarar";
+}
 
 export default function Library() {
   const { data: library, isLoading } = useLibrary();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [formFilter, setFormFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [page, setPage] = useState(1);
 
   const filteredLibrary = useMemo(() => {
     if (!library) return [];
-    return library.filter(item => {
-      const matchesSearch = !search ||
-        item.title_ar.includes(search) ||
-        item.jurisdiction_ar.includes(search);
+    return library.filter((item) => {
+      const form = classifySaudiForm(item);
+      const matchesSearch = !search || item.title_ar.includes(search) || item.jurisdiction_ar.includes(search);
       const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+      const matchesForm = formFilter === "all" || form === formFilter;
       const matchesSource = sourceFilter === "all" || item.primary_source_id === sourceFilter;
-      return matchesSearch && matchesCategory && matchesSource;
+      return matchesSearch && matchesCategory && matchesForm && matchesSource;
     });
-  }, [library, search, categoryFilter, sourceFilter]);
+  }, [library, search, categoryFilter, formFilter, sourceFilter]);
 
   const totalPages = Math.ceil((filteredLibrary?.length || 0) / ITEMS_PER_PAGE);
-  const paginatedLibrary = filteredLibrary?.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE
-  );
+  const paginatedLibrary = filteredLibrary?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const handleFilterChange = (setter: (v: string) => void, value: string) => {
     setter(value);
@@ -70,16 +97,14 @@ export default function Library() {
           <h1 className="text-3xl font-bold text-primary mb-2">الأنظمة واللوائح</h1>
           <p className="text-muted-foreground">
             {filteredLibrary ? `${filteredLibrary.length} وثيقة` : "جارٍ التحميل..."}
-            {library && filteredLibrary && filteredLibrary.length !== library.length &&
-              ` من أصل ${library.length}`
-            }
+            {library && filteredLibrary && filteredLibrary.length !== library.length && ` من أصل ${library.length}`}
           </p>
         </div>
 
         <div className="relative w-full md:w-96">
           <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="بحث في المكتبة..."
+            placeholder="بحث في الأنظمة واللوائح..."
             className="pr-9"
             value={search}
             onChange={(e) => handleFilterChange(setSearch, e.target.value)}
@@ -106,14 +131,30 @@ export default function Library() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {SAUDI_LEGAL_FORMS.map((form) => (
+            <button
+              key={form.value}
+              onClick={() => handleFilterChange(setFormFilter, form.value)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                formFilter === form.value
+                  ? "bg-primary/80 text-primary-foreground"
+                  : "bg-primary/5 text-primary hover:bg-primary/10"
+              }`}
+            >
+              {form.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
           {SOURCES.map((src) => (
             <button
               key={src.value}
               onClick={() => handleFilterChange(setSourceFilter, src.value)}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 sourceFilter === src.value
-                  ? "bg-primary/80 text-primary-foreground"
-                  : "bg-primary/5 text-primary hover:bg-primary/10"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
               }`}
             >
               {src.label}
@@ -124,54 +165,52 @@ export default function Library() {
 
       {isLoading ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Array(6).fill(0).map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-xl" />
-          ))}
+          {Array(6)
+            .fill(0)
+            .map((_, i) => (
+              <Skeleton key={i} className="h-48 rounded-xl" />
+            ))}
         </div>
       ) : (
         <>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {paginatedLibrary?.map((item) => (
-              <Link key={item.id} href={`/law/${item.id}`}>
-                <Card className="h-full hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer group">
-                  <CardHeader>
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                        <BookOpen className="w-5 h-5" />
+            {paginatedLibrary?.map((item) => {
+              const form = classifySaudiForm(item);
+              return (
+                <Link key={item.id} href={`/law/${item.id}`}>
+                  <Card className="h-full hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer group">
+                    <CardHeader>
+                      <div className="flex justify-between items-start gap-2 flex-wrap">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <BookOpen className="w-5 h-5" />
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap justify-end">
+                          <Badge variant={item.category === "law" ? "default" : "secondary"}>
+                            {CATEGORY_LABELS[item.category] || item.category}
+                          </Badge>
+                          <Badge variant="outline" className="text-[11px] border-primary/30 text-primary">
+                            {SAUDI_FORM_LABELS[form] || SAUDI_FORM_LABELS.qarar}
+                          </Badge>
+                        </div>
                       </div>
-                      <Badge variant={item.category === 'law' ? 'default' : 'secondary'}>
-                        {CATEGORY_LABELS[item.category] || item.category}
-                      </Badge>
-                    </div>
-                    <CardTitle className="mt-4 text-xl leading-snug group-hover:text-primary transition-colors">
-                      {item.title_ar}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 mb-2">
-                      <p className="text-sm text-muted-foreground">
-                        {item.jurisdiction_ar}
-                      </p>
-                      {item.primary_source_id === "uqn" && (
-                        <Badge variant="outline" className="text-xs border-green-300 text-green-700">
-                          أم القرى
-                        </Badge>
-                      )}
-                    </div>
-
-                    {item.laws_included && (
-                      <div className="flex flex-wrap gap-2">
-                        {item.laws_included.map((law, idx) => (
-                          <span key={idx} className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground">
-                            {law}
-                          </span>
-                        ))}
+                      <CardTitle className="mt-4 text-xl leading-snug group-hover:text-primary transition-colors">
+                        {item.title_ar}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-sm text-muted-foreground">{item.jurisdiction_ar}</p>
+                        {item.primary_source_id === "uqn" && (
+                          <Badge variant="outline" className="text-xs border-green-300 text-green-700">
+                            أم القرى
+                          </Badge>
+                        )}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
 
             {filteredLibrary?.length === 0 && (
               <div className="col-span-full py-12 text-center text-muted-foreground">
@@ -185,7 +224,7 @@ export default function Library() {
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 mt-8">
               <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -210,9 +249,7 @@ export default function Library() {
                       key={pageNum}
                       onClick={() => setPage(pageNum)}
                       className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                        page === pageNum
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted hover:bg-muted/80"
+                        page === pageNum ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
                       }`}
                     >
                       {pageNum}
@@ -222,7 +259,7 @@ export default function Library() {
               </div>
 
               <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
