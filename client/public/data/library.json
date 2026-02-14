@@ -2179,21 +2179,6 @@
     "notes_ar": "يحتوي على 26 تعديل"
   },
   {
-    "id": "50a73b74-b979-4baa-90b1-b3d000c23f5e",
-    "title_ar": "التفاصيل",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "law",
-    "primary_source_id": "boe",
-    "links": [
-      {
-        "source_id": "boe",
-        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/50a73b74-b979-4baa-90b1-b3d000c23f5e/1",
-        "label_ar": "النص الرسمي - هيئة الخبراء"
-      }
-    ]
-  },
-  {
     "id": "5160cfca-da74-4008-97e2-a9a700f23b92",
     "title_ar": "تنظيم المؤسسة العامة للتقاعد",
     "jurisdiction_ar": "السعودية",
@@ -2645,21 +2630,6 @@
       }
     ],
     "notes_ar": "يحتوي على 1 تعديل"
-  },
-  {
-    "id": "6383680e-0543-4ac7-8e62-b320009dbfa0",
-    "title_ar": "التفاصيل",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "law",
-    "primary_source_id": "boe",
-    "links": [
-      {
-        "source_id": "boe",
-        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/6383680e-0543-4ac7-8e62-b320009dbfa0/1",
-        "label_ar": "النص الرسمي - هيئة الخبراء"
-      }
-    ]
   },
   {
     "id": "6383fcba-9d26-428a-8b5a-a9a700f29275",
@@ -3139,21 +3109,6 @@
       }
     ],
     "notes_ar": "يحتوي على 9 تعديل"
-  },
-  {
-    "id": "737705df-17ad-42b0-9094-a9a700f1bb61",
-    "title_ar": "عذراً، لقد حدث خطأ",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "law",
-    "primary_source_id": "boe",
-    "links": [
-      {
-        "source_id": "boe",
-        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/737705df-17ad-42b0-9094-a9a700f1bb61/1",
-        "label_ar": "النص الرسمي - هيئة الخبراء"
-      }
-    ]
   },
   {
     "id": "738c42bb-a29f-4da7-bed4-b1d300a55f20",
@@ -4118,21 +4073,6 @@
       {
         "source_id": "boe",
         "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/898062b9-805f-4bab-974c-ac4500ed4262/1",
-        "label_ar": "النص الرسمي - هيئة الخبراء"
-      }
-    ]
-  },
-  {
-    "id": "89829020-b868-4a45-bca4-b33200ad2d77",
-    "title_ar": "التفاصيل",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "law",
-    "primary_source_id": "boe",
-    "links": [
-      {
-        "source_id": "boe",
-        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/89829020-b868-4a45-bca4-b33200ad2d77/1",
         "label_ar": "النص الرسمي - هيئة الخبراء"
       }
     ]
@@ -5174,21 +5114,6 @@
     "notes_ar": "يحتوي على 3 تعديل"
   },
   {
-    "id": "a73b2b40-64c8-449e-aa8f-b3ca009257ce",
-    "title_ar": "التفاصيل",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "law",
-    "primary_source_id": "boe",
-    "links": [
-      {
-        "source_id": "boe",
-        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/a73b2b40-64c8-449e-aa8f-b3ca009257ce/1",
-        "label_ar": "النص الرسمي - هيئة الخبراء"
-      }
-    ]
-  },
-  {
     "id": "a748e485-620c-45c4-8ca8-a9f40166406d",
     "title_ar": "اللائحة التنفيذية لنظام الإفلاس",
     "jurisdiction_ar": "السعودية",
@@ -5661,21 +5586,6 @@
       {
         "source_id": "boe",
         "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/b680a5b2-1ed3-4014-9f49-a9a700f2e298/1",
-        "label_ar": "النص الرسمي - هيئة الخبراء"
-      }
-    ]
-  },
-  {
-    "id": "b6c66cda-7f2c-408d-94b7-b3d300dbffe8",
-    "title_ar": "التفاصيل",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "law",
-    "primary_source_id": "boe",
-    "links": [
-      {
-        "source_id": "boe",
-        "url": "https://laws.boe.gov.sa/BoeLaws/Laws/LawDetails/b6c66cda-7f2c-408d-94b7-b3d300dbffe8/1",
         "label_ar": "النص الرسمي - هيئة الخبراء"
       }
     ]
@@ -24713,7 +24623,8 @@
         "url": "https://www.uqn.gov.sa/details?p=23959",
         "label_ar": "جريدة أم القرى الرسمية"
       }
-    ]
+    ],
+    "extraction_status": "failed"
   },
   {
     "id": "uqn_23960",
@@ -53226,36 +53137,6 @@
       {
         "source_id": "uqn",
         "url": "https://www.uqn.gov.sa/details?p=23229",
-        "label_ar": "جريدة أم القرى الرسمية"
-      }
-    ]
-  },
-  {
-    "id": "uqn_23252",
-    "title_ar": "الإعلانات الحكومية معاد لعدد 4989",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "gazette",
-    "primary_source_id": "uqn",
-    "links": [
-      {
-        "source_id": "uqn",
-        "url": "https://www.uqn.gov.sa/details?p=23252",
-        "label_ar": "جريدة أم القرى الرسمية"
-      }
-    ]
-  },
-  {
-    "id": "uqn_23254",
-    "title_ar": "الإعلانات الحكومية لعدد 4989",
-    "jurisdiction_ar": "السعودية",
-    "doc_type": "official_text",
-    "category": "gazette",
-    "primary_source_id": "uqn",
-    "links": [
-      {
-        "source_id": "uqn",
-        "url": "https://www.uqn.gov.sa/details?p=23254",
         "label_ar": "جريدة أم القرى الرسمية"
       }
     ]

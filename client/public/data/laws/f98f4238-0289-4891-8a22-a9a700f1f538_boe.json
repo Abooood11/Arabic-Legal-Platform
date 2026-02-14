@@ -80,7 +80,12 @@
         }
       ],
       "amendments": [],
-      "heading_context": []
+      "heading_context": [],
+      "section": "",
+      "part": "",
+      "chapter": "",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 2,
@@ -117,7 +122,11 @@
       "notes_ar": "تم تعديل هذه المادة 1 مرة",
       "heading_context": [
         "الفصل الأول: أحكام تمهيدية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الأول: أحكام تمهيدية",
+      "branch": ""
     },
     {
       "number": null,
@@ -165,7 +174,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الأول: أحكام تمهيدية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الأول: أحكام تمهيدية",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 4,
@@ -193,7 +207,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثاني: التسجيل لأغراض الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثاني: التسجيل لأغراض الضريبة",
+      "branch": ""
     },
     {
       "number": 5,
@@ -236,7 +254,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثاني: التسجيل لأغراض الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثاني: التسجيل لأغراض الضريبة",
+      "branch": ""
     },
     {
       "number": null,
@@ -254,7 +276,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثاني: التسجيل لأغراض الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثاني: التسجيل لأغراض الضريبة",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 7,
@@ -272,7 +299,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث: توريدات السلع والخدمات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث: توريدات السلع والخدمات",
+      "branch": ""
     },
     {
       "number": 8,
@@ -290,7 +321,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث: توريدات السلع والخدمات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث: توريدات السلع والخدمات",
+      "branch": ""
     },
     {
       "number": 9,
@@ -308,7 +343,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث: توريدات السلع والخدمات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث: توريدات السلع والخدمات",
+      "branch": ""
     },
     {
       "number": 10,
@@ -326,7 +365,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث: توريدات السلع والخدمات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث: توريدات السلع والخدمات",
+      "branch": ""
     },
     {
       "number": 11,
@@ -344,7 +387,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث: توريدات السلع والخدمات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث: توريدات السلع والخدمات",
+      "branch": ""
     },
     {
       "number": 12,
@@ -362,7 +409,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث: توريدات السلع والخدمات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث: توريدات السلع والخدمات",
+      "branch": ""
     },
     {
       "number": null,
@@ -380,7 +431,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث: توريدات السلع والخدمات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث: توريدات السلع والخدمات",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 14,
@@ -398,7 +454,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الرابع: مكان التوريد"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الرابع: مكان التوريد",
+      "branch": ""
     },
     {
       "number": null,
@@ -421,7 +481,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الرابع: مكان التوريد"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الرابع: مكان التوريد",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": null,
@@ -444,7 +509,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الخامس: القيمة الخاضعة للضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الخامس: القيمة الخاضعة للضريبة",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 17,
@@ -462,7 +532,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس: الاستيراد"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس: الاستيراد",
+      "branch": ""
     },
     {
       "number": null,
@@ -480,7 +554,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس: الاستيراد"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس: الاستيراد",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 19,
@@ -498,7 +577,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السابع: احتساب الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السابع: احتساب الضريبة",
+      "branch": ""
     },
     {
       "number": 20,
@@ -516,7 +599,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السابع: احتساب الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السابع: احتساب الضريبة",
+      "branch": ""
     },
     {
       "number": 21,
@@ -544,7 +631,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السابع: احتساب الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السابع: احتساب الضريبة",
+      "branch": ""
     },
     {
       "number": null,
@@ -592,7 +683,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل السابع: احتساب الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السابع: احتساب الضريبة",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": null,
@@ -635,7 +731,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثامن: خصم الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثامن: خصم الضريبة",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": null,
@@ -663,7 +764,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل التاسع: الفواتير الضريبية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل التاسع: الفواتير الضريبية",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 25,
@@ -681,7 +787,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل العاشر: الإقرار الضريبي"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل العاشر: الإقرار الضريبي",
+      "branch": ""
     },
     {
       "number": 26,
@@ -714,7 +824,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل العاشر: الإقرار الضريبي"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل العاشر: الإقرار الضريبي",
+      "branch": ""
     },
     {
       "number": null,
@@ -747,7 +861,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل العاشر: الإقرار الضريبي"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل العاشر: الإقرار الضريبي",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 28,
@@ -770,7 +889,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الحادي عشر: سداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الحادي عشر: سداد الضريبة",
+      "branch": ""
     },
     {
       "number": 29,
@@ -788,7 +911,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الحادي عشر: سداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الحادي عشر: سداد الضريبة",
+      "branch": ""
     },
     {
       "number": 30,
@@ -806,7 +933,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الحادي عشر: سداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الحادي عشر: سداد الضريبة",
+      "branch": ""
     },
     {
       "number": null,
@@ -824,7 +955,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الحادي عشر: سداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الحادي عشر: سداد الضريبة",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 32,
@@ -842,7 +978,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثاني عشر: استرداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثاني عشر: استرداد الضريبة",
+      "branch": ""
     },
     {
       "number": 33,
@@ -865,7 +1005,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثاني عشر: استرداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثاني عشر: استرداد الضريبة",
+      "branch": ""
     },
     {
       "number": 34,
@@ -883,7 +1027,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثاني عشر: استرداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثاني عشر: استرداد الضريبة",
+      "branch": ""
     },
     {
       "number": null,
@@ -911,7 +1059,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثاني عشر: استرداد الضريبة"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثاني عشر: استرداد الضريبة",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": null,
@@ -929,7 +1082,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثالث عشر: سرية المعلومات وتبادلها"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثالث عشر: سرية المعلومات وتبادلها",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 37,
@@ -947,7 +1105,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الرابع عشر: حفظ المستندات والمسؤولية التضامنية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الرابع عشر: حفظ المستندات والمسؤولية التضامنية",
+      "branch": ""
     },
     {
       "number": null,
@@ -965,7 +1127,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الرابع عشر: حفظ المستندات والمسؤولية التضامنية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الرابع عشر: حفظ المستندات والمسؤولية التضامنية",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": null,
@@ -993,7 +1160,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل الخامس عشر: التفتيش والضبط"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الخامس عشر: التفتيش والضبط",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 40,
@@ -1011,7 +1183,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": 41,
@@ -1029,7 +1205,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": 42,
@@ -1057,7 +1237,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": 43,
@@ -1075,7 +1259,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": 44,
@@ -1093,7 +1281,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": 45,
@@ -1126,7 +1318,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": 46,
@@ -1149,7 +1345,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": 47,
@@ -1167,7 +1367,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": ""
     },
     {
       "number": null,
@@ -1195,7 +1399,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل السادس عشر: التهرب الضريبي والعقوبات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السادس عشر: التهرب الضريبي والعقوبات",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 49,
@@ -1231,7 +1440,11 @@
       "notes_ar": "تم تعديل هذه المادة 1 مرة",
       "heading_context": [
         "الفصل السابع عشر: إيقاع العقوبات والنظر في المخالفات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السابع عشر: إيقاع العقوبات والنظر في المخالفات",
+      "branch": ""
     },
     {
       "number": null,
@@ -1249,7 +1462,12 @@
       "amendments": [],
       "heading_context": [
         "الفصل السابع عشر: إيقاع العقوبات والنظر في المخالفات"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل السابع عشر: إيقاع العقوبات والنظر في المخالفات",
+      "branch": "",
+      "is_heading": true
     },
     {
       "number": 51,
@@ -1272,7 +1490,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثامن عشر: أحكام ختامية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثامن عشر: أحكام ختامية",
+      "branch": ""
     },
     {
       "number": 52,
@@ -1290,7 +1512,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثامن عشر: أحكام ختامية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثامن عشر: أحكام ختامية",
+      "branch": ""
     },
     {
       "number": 53,
@@ -1313,7 +1539,11 @@
       "amendments": [],
       "heading_context": [
         "الفصل الثامن عشر: أحكام ختامية"
-      ]
+      ],
+      "section": "",
+      "part": "",
+      "chapter": "الفصل الثامن عشر: أحكام ختامية",
+      "branch": ""
     }
   ],
   "royal_decree": {
