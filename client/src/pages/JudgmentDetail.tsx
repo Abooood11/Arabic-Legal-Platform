@@ -606,14 +606,14 @@ export default function JudgmentDetail() {
             <div className="container mx-auto px-4 py-6 max-w-4xl">
                 {/* Header */}
                 <div className={`mb-5 p-5 rounded-2xl bg-background border shadow-sm border-r-4 ${
-                    isEgyptian ? "border-r-accent" : "border-r-primary"
+                    isEgyptian ? "border-r-amber-500" : "border-r-primary"
                 }`}>
                     <div className="flex items-start justify-between gap-3 mb-3">
                         <h1 className="text-lg font-bold text-foreground leading-snug">
                             {displayCourtName}
                         </h1>
                         {isEgyptian ? (
-                            <Badge variant="outline" className="border-accent/30 text-accent-foreground bg-accent/10 text-[10px] gap-1 shrink-0">
+                            <Badge variant="outline" className="border-amber-600/30 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 text-[10px] gap-1 shrink-0">
                                 <Scale className="h-3 w-3" /> مصر
                             </Badge>
                         ) : (

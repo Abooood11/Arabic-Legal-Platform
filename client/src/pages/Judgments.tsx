@@ -99,9 +99,9 @@ const TABS: { key: SourceTab; label: string; shortLabel: string; icon: React.Rea
         label: "الأحكام المصرية",
         shortLabel: "مصر",
         icon: <Scale className="h-4 w-4" />,
-        color: "text-muted-foreground hover:text-accent-foreground hover:bg-accent/10 border-transparent",
-        activeColor: "bg-accent text-accent-foreground shadow-md border-accent",
-        badgeColor: "border-accent/30 text-accent-foreground bg-accent/10",
+        color: "text-muted-foreground hover:text-amber-700 hover:bg-amber-50 border-transparent",
+        activeColor: "bg-amber-600 text-white shadow-md border-amber-600",
+        badgeColor: "border-amber-600/30 text-amber-700 bg-amber-50",
     },
 ];
 
@@ -138,7 +138,7 @@ function HighlightedSnippet({ text }: { text: string }) {
 function SourceBadge({ source }: { source?: string }) {
     if (source === "eg_naqd") {
         return (
-            <Badge variant="outline" className="border-accent/30 text-accent-foreground bg-accent/10 text-[11px] gap-1">
+            <Badge variant="outline" className="border-amber-600/30 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 text-[11px] gap-1">
                 <Scale className="h-3 w-3" />
                 مصر
             </Badge>
@@ -457,7 +457,7 @@ export default function Judgments() {
                                 return (
                                     <Link key={item.id} href={`/judgments/${item.id}`} className="block">
                                         <div className={`group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer ${
-                                            isEg ? "border-r-4 border-r-accent" : "border-r-4 border-r-primary"
+                                            isEg ? "border-r-4 border-r-amber-500" : "border-r-4 border-r-primary"
                                         }`}>
                                             {/* Top row: source badge + metadata */}
                                             <div className="flex items-start justify-between gap-3 mb-2">

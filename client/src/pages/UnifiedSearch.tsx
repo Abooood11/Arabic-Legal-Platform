@@ -895,18 +895,18 @@ function JudgmentResultCard({ item, query, index }: { item: JudgmentResult; quer
   return (
     <Link href={`/judgments/${item.id}`} onClick={() => query && trackSearchClick(query, "judgments", String(item.id), index || 0)}>
       <div className={`group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer border-r-4 ${
-        isEg ? "border-r-accent" : "border-r-primary"
+        isEg ? "border-r-amber-500" : "border-r-primary"
       }`}>
         <div className="flex items-start gap-3">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-            isEg ? "bg-accent/10 text-accent-foreground group-hover:bg-accent" : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+            isEg ? "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white" : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
           }`}>
             <Scale className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="font-bold text-foreground">{item.court_body || "حكم قضائي"}</span>
-              <Badge variant="outline" className={`text-[10px] ${isEg ? "border-accent/30 text-accent-foreground" : "border-primary/30 text-primary"}`}>
+              <Badge variant="outline" className={`text-[10px] ${isEg ? "border-amber-600/30 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30" : "border-primary/30 text-primary"}`}>
                 {isEg ? "مصر" : "السعودية"}
               </Badge>
             </div>
