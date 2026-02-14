@@ -20,15 +20,17 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/library" className="flex items-center gap-2 group">
-            <div className="bg-primary/10 p-1.5 rounded-lg group-hover:bg-primary/20 transition-colors">
-              <Scale className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-tight text-primary leading-none">تـشـريـع</span>
-              <span className="text-[10px] text-muted-foreground font-medium mt-0.5">منصة النصوص القانونية السعودية</span>
+          <Link href="/library" className="flex items-center gap-3 group" data-testid="brand-link">
+            <img
+              src="/tashree-logo.svg"
+              alt="شعار المنصة"
+              className="h-16 w-16 object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-105"
+            />
+            <div className="hidden sm:flex flex-col">
+              <span className="text-sm font-semibold text-primary leading-none">منصة النصوص القانونية السعودية</span>
+              <span className="text-[11px] text-muted-foreground font-medium mt-1">بحث دقيق في الأنظمة والأحكام</span>
             </div>
           </Link>
         </div>
@@ -39,8 +41,7 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items - center gap - 2 text - sm font - medium transition - colors hover: text - primary ${location === link.href ? "text-primary" : "text-muted-foreground"
-                } `}
+              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${location === link.href ? "text-primary" : "text-muted-foreground"}`}
             >
               <link.icon className="w-4 h-4" />
               {link.label}
@@ -80,11 +81,13 @@ export function Navbar() {
           <SheetContent side="right" className="w-[80%] sm:w-[385px]">
             <div className="flex flex-col gap-6 mt-6">
               <div className="flex flex-col">
-                <Link href="/library" onClick={() => setIsOpen(false)} className="flex items-center gap-2 font-bold text-xl text-primary">
-                  <Scale className="h-6 w-6" />
-                  منصة تشريع
+                <Link href="/library" onClick={() => setIsOpen(false)} className="flex items-center gap-3" data-testid="brand-link-mobile">
+                  <img src="/tashree-logo.svg" alt="شعار المنصة" className="h-12 w-12 object-contain drop-shadow-sm" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-primary">منصة النصوص القانونية السعودية</span>
+                    <span className="text-[11px] text-muted-foreground">بحث دقيق في الأنظمة والأحكام</span>
+                  </div>
                 </Link>
-                <span className="text-[10px] text-muted-foreground mr-8">منصة النصوص القانونية السعودية</span>
               </div>
               <nav className="flex flex-col gap-2">
                 {links.map((link) => (
@@ -92,10 +95,7 @@ export function Navbar() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setIsOpen(false)}
-                    className={`flex items - center gap - 3 px - 4 py - 3 rounded - lg text - sm font - medium transition - colors ${location === link.href
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted text-muted-foreground"
-                      } `}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location === link.href ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}
                   >
                     <link.icon className="w-5 h-5" />
                     {link.label}
