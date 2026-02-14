@@ -29,7 +29,6 @@ const SOURCES = [
   { value: "all", label: "جميع المصادر" },
   { value: "boe", label: "هيئة الخبراء" },
   { value: "uqn", label: "جريدة أم القرى" },
-  { value: "manual", label: "إدخال يدوي" },
 ];
 
 const CATEGORY_LABELS: Record<string, string> = {

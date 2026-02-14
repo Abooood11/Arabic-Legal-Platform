@@ -68,61 +68,6 @@ const saudiGazetteCategoryCaseSql = (alias: string) => `
   END
 `;
 
-const saudiGazetteCategoryCaseSql = (alias: string) => `
-  CASE
-    WHEN COALESCE(${alias}.category, '') LIKE '%مرسوم ملكي%' THEN 'مراسيم ملكية'
-    WHEN COALESCE(${alias}.category, '') LIKE '%أمر ملكي%' OR COALESCE(${alias}.category, '') LIKE '%أمر سام%' THEN 'أوامر ملكية وسامية'
-    WHEN COALESCE(${alias}.category, '') LIKE '%قرار مجلس الوزراء%' THEN 'قرارات مجلس الوزراء'
-    WHEN COALESCE(${alias}.category, '') IN ('نظام', 'نظام أساسي', 'قانون')
-      OR ${alias}.title LIKE '%نظام %'
-      OR ${alias}.title LIKE 'نظام%'
-      THEN 'أنظمة'
-    WHEN COALESCE(${alias}.category, '') LIKE '%لائحة%'
-      OR ${alias}.title LIKE '%اللائحة%'
-      OR ${alias}.title LIKE '%لائحة%'
-      THEN 'لوائح تنفيذية وتنظيمية'
-    WHEN (
-      COALESCE(${alias}.category, '') IN ('إعلان', 'بلاغ', 'بيان', 'تنويه', 'إشعار')
-      OR ${alias}.title LIKE '%إعلان%'
-      OR ${alias}.title LIKE '%بلاغ%'
-      OR ${alias}.title LIKE '%تنويه%'
-    )
-      AND (
-        ${alias}.title LIKE '%شركة%'
-        OR ${alias}.title LIKE '%شركاء%'
-        OR ${alias}.title LIKE '%مساهمة%'
-        OR ${alias}.title LIKE '%ذات مسؤولية محدودة%'
-      )
-      THEN 'إعلانات الشركات'
-    WHEN COALESCE(${alias}.category, '') = 'عقد تأسيس'
-      OR ${alias}.title LIKE '%عقد تأسيس%'
-      OR ${alias}.title LIKE '%تأسيس شركة%'
-      THEN 'الشركات والكيانات التجارية'
-    WHEN COALESCE(${alias}.category, '') IN ('اتفاقية', 'ميثاق', 'مذكرة')
-      OR ${alias}.title LIKE '%اتفاقية%'
-      OR ${alias}.title LIKE '%مذكرة تفاهم%'
-      OR ${alias}.title LIKE '%بروتوكول%'
-      THEN 'اتفاقيات ومعاهدات'
-    WHEN COALESCE(${alias}.category, '') LIKE '%قرار%'
-      OR ${alias}.title LIKE 'قرار %'
-      THEN 'قرارات تنظيمية'
-    WHEN COALESCE(${alias}.category, '') IN ('تعليمات', 'قواعد', 'ضوابط', 'آلية')
-      OR ${alias}.title LIKE '%قواعد%'
-      OR ${alias}.title LIKE '%ضوابط%'
-      OR ${alias}.title LIKE '%تعليمات%'
-      THEN 'قواعد وضوابط'
-    WHEN COALESCE(${alias}.category, '') IN ('بيان', 'إعلان', 'بلاغ', 'تنويه', 'تعميم', 'خبر', 'إشعار')
-      OR ${alias}.title LIKE '%إعلان%'
-      OR ${alias}.title LIKE '%بيان%'
-      OR ${alias}.title LIKE '%بلاغ%'
-      THEN 'إعلانات وبيانات رسمية'
-    WHEN COALESCE(${alias}.category, '') LIKE '%مواصفات قياسية%'
-      OR ${alias}.title LIKE '%مواصفات%'
-      THEN 'مواصفات ومعايير'
-    ELSE 'وثائق رسمية أخرى'
-  END
-`;
-
 function buildGazetteIssuePdfUrl(issueNumber?: string | null): string | null {
   const normalized = String(issueNumber || "").trim();
   if (!normalized) return null;
@@ -723,6 +668,30 @@ export async function registerRoutes(
     WHERE gazette_fts MATCH ?
   `);
 
+  // MOJ Tameems (تعاميم وزارة العدل) search statements
+  let searchTameemsStmt: any = null;
+  let countTameemsStmt: any = null;
+  try {
+    searchTameemsStmt = sqlite.prepare(`
+      SELECT t.id, t.serial, t.tameem_number, t.tameem_date, t.subject, t.year_hijri,
+             snippet(moj_tameems_fts, 2, '【', '】', '...', 40) as textSnippet,
+             bm25(moj_tameems_fts) as rank
+      FROM moj_tameems t
+      INNER JOIN moj_tameems_fts fts ON t.id = fts.rowid
+      WHERE moj_tameems_fts MATCH ?
+      ORDER BY rank
+      LIMIT ? OFFSET ?
+    `);
+    countTameemsStmt = sqlite.prepare(`
+      SELECT count(*) as count
+      FROM moj_tameems t
+      INNER JOIN moj_tameems_fts fts ON t.id = fts.rowid
+      WHERE moj_tameems_fts MATCH ?
+    `);
+  } catch {
+    // Table may not exist yet
+  }
+
   app.get("/api/search", async (req, res) => {
     try {
       const startTime = Date.now();
@@ -739,7 +708,7 @@ export async function registerRoutes(
           totalResults: 0,
           timeTaken: 0,
           intent: null,
-          results: { laws: { items: [], total: 0 }, judgments: { items: [], total: 0 }, gazette: { items: [], total: 0 } }
+          results: { laws: { items: [], total: 0 }, judgments: { items: [], total: 0 }, gazette: { items: [], total: 0 }, tameems: { items: [], total: 0 } }
         });
       }
 
@@ -779,13 +748,24 @@ export async function registerRoutes(
         } catch { return { items: [], total: 0 }; }
       };
 
+      const searchTameems = () => {
+        if (type !== "all" && type !== "tameems") return { items: [], total: 0 };
+        if (!searchTameemsStmt) return { items: [], total: 0 };
+        try {
+          const items = searchTameemsStmt.all(ftsQuery, limit, offset) as any[];
+          const countResult = countTameemsStmt.get(ftsQuery) as any;
+          return { items, total: countResult?.count || 0 };
+        } catch { return { items: [], total: 0 }; }
+      };
+
       // Execute all searches (SQLite is sync so they run sequentially, but each is fast with FTS5)
       const lawResults = searchLaws();
       const judgmentResults = searchJudgments();
       const gazetteResults = searchGazette();
+      const tameemsResults = searchTameems();
 
       const timeTaken = Date.now() - startTime;
-      const totalResults = lawResults.total + judgmentResults.total + gazetteResults.total;
+      const totalResults = lawResults.total + judgmentResults.total + gazetteResults.total + tameemsResults.total;
 
       // Cross-reference: find related content across types
       const crossLinks: { lawsToJudgments: string[]; lawsToGazette: string[]; relatedLaws: string[] } = { lawsToJudgments: [], lawsToGazette: [], relatedLaws: [] };
@@ -877,6 +857,7 @@ export async function registerRoutes(
           laws: lawResults,
           judgments: judgmentResults,
           gazette: gazetteResults,
+          tameems: tameemsResults,
         }
       });
     } catch (err: any) {
@@ -943,16 +924,119 @@ export async function registerRoutes(
       const judgmentCount = (sqlite.prepare("SELECT count(*) as cnt FROM judgments").get() as any)?.cnt || 0;
       const gazetteCount = (sqlite.prepare("SELECT count(*) as cnt FROM gazette_index").get() as any)?.cnt || 0;
       const lawNamesCount = (sqlite.prepare("SELECT count(DISTINCT law_id) as cnt FROM law_articles").get() as any)?.cnt || 0;
+      let tameemsCount = 0;
+      try { tameemsCount = (sqlite.prepare("SELECT count(*) as cnt FROM moj_tameems").get() as any)?.cnt || 0; } catch {}
 
       res.set("Cache-Control", "public, max-age=3600");
       res.json({
-        totalDocuments: lawCount + judgmentCount + gazetteCount,
+        totalDocuments: lawCount + judgmentCount + gazetteCount + tameemsCount,
         laws: { articles: lawCount, laws: lawNamesCount },
         judgments: { total: judgmentCount },
         gazette: { total: gazetteCount },
+        tameems: { total: tameemsCount },
       });
     } catch {
-      res.json({ totalDocuments: 0, laws: { articles: 0, laws: 0 }, judgments: { total: 0 }, gazette: { total: 0 } });
+      res.json({ totalDocuments: 0, laws: { articles: 0, laws: 0 }, judgments: { total: 0 }, gazette: { total: 0 }, tameems: { total: 0 } });
+    }
+  });
+
+  // ============================================
+  // MOJ Tameems (تعاميم وزارة العدل) API
+  // ============================================
+  app.get("/api/tameems", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const offset = (page - 1) * limit;
+      const subject = req.query.subject as string;
+      const year = parseInt(req.query.year as string) || null;
+      const q = (req.query.q as string || "").trim();
+
+      // FTS search path
+      const qClean = q.replace(/\u0640/g, ''); // Strip tatweel for Arabic search
+      if (qClean.length >= 2 && searchTameemsStmt) {
+        try {
+          const ftsQuery = buildLegalFtsQuery(qClean);
+          const conditions: string[] = [];
+          const params: any[] = [];
+          if (subject) { conditions.push('t.subject = ?'); params.push(subject); }
+          if (year) { conditions.push('t.year_hijri = ?'); params.push(year); }
+          const extraWhere = conditions.length > 0 ? ' AND ' + conditions.join(' AND ') : '';
+
+          const items = sqlite.prepare(`
+            SELECT t.id, t.serial, t.tameem_number, t.tameem_date, t.subject, t.year_hijri,
+                   snippet(moj_tameems_fts, 2, '【', '】', '...', 50) as textPreview,
+                   bm25(moj_tameems_fts) as rank
+            FROM moj_tameems t
+            INNER JOIN moj_tameems_fts fts ON t.id = fts.rowid
+            WHERE moj_tameems_fts MATCH ?${extraWhere}
+            ORDER BY rank
+            LIMIT ? OFFSET ?
+          `).all(ftsQuery, ...params, limit, offset) as any[];
+
+          const countResult = sqlite.prepare(`
+            SELECT count(*) as c
+            FROM moj_tameems t
+            INNER JOIN moj_tameems_fts fts ON t.id = fts.rowid
+            WHERE moj_tameems_fts MATCH ?${extraWhere}
+          `).get(ftsQuery, ...params) as any;
+
+          const subjects = sqlite.prepare(`
+            SELECT subject, count(*) as count FROM moj_tameems GROUP BY subject ORDER BY count DESC
+          `).all() as any[];
+
+          res.set("Cache-Control", "public, max-age=300");
+          return res.json({ items, total: countResult?.c || 0, page, limit, subjects });
+        } catch {
+          // Fall through to non-FTS path
+        }
+      }
+
+      // Non-FTS path (browse/filter)
+      let where = '';
+      const params: any[] = [];
+      const conditions: string[] = [];
+      if (subject) { conditions.push('subject = ?'); params.push(subject); }
+      if (year) { conditions.push('year_hijri = ?'); params.push(year); }
+      if (q) {
+        // Strip tatweel (ـ) for better Arabic search matching
+        const qNorm = q.replace(/\u0640/g, '');
+        conditions.push("(REPLACE(subject, 'ـ', '') LIKE ? OR REPLACE(text, 'ـ', '') LIKE ? OR tameem_number LIKE ?)");
+        params.push(`%${qNorm}%`, `%${qNorm}%`, `%${q}%`);
+      }
+      if (conditions.length > 0) where = 'WHERE ' + conditions.join(' AND ');
+
+      const total = (sqlite.prepare(`SELECT count(*) as c FROM moj_tameems ${where}`).get(...params) as any)?.c || 0;
+      const items = sqlite.prepare(`
+        SELECT id, serial, tameem_number, tameem_date, subject, year_hijri,
+               substr(text, 1, 200) as textPreview
+        FROM moj_tameems ${where}
+        ORDER BY tameem_date DESC
+        LIMIT ? OFFSET ?
+      `).all(...params, limit, offset) as any[];
+
+      const subjects = sqlite.prepare(`
+        SELECT subject, count(*) as count FROM moj_tameems GROUP BY subject ORDER BY count DESC
+      `).all() as any[];
+
+      res.set("Cache-Control", "public, max-age=300");
+      res.json({ items, total, page, limit, subjects });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/tameems/:id", async (req, res) => {
+    try {
+      const tameem = sqlite.prepare(`
+        SELECT * FROM moj_tameems WHERE id = ? OR serial = ?
+      `).get(req.params.id, req.params.id) as any;
+
+      if (!tameem) return res.status(404).json({ error: "تعميم غير موجود" });
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json(tameem);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 

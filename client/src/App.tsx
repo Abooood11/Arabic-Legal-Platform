@@ -41,6 +41,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 import Judgments from "@/pages/Judgments";
 import JudgmentDetail from "@/pages/JudgmentDetail";
 import GazetteIndex from "@/pages/GazetteIndex";
+import MojTameems from "@/pages/MojTameems";
 
 function Router() {
   useAnalytics();
@@ -54,6 +55,7 @@ function Router() {
         <Route path="/judgments" component={Judgments} />
         <Route path="/judgments/:id" component={JudgmentDetail} />
         <Route path="/gazette" component={GazetteIndex} />
+        <Route path="/tameems" component={MojTameems} />
         <Route path="/search" component={UnifiedSearch} />
         <Route path="/about" component={About} />
         <Route path="/auth" component={AuthPortal} />
