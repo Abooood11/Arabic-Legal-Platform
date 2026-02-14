@@ -345,7 +345,7 @@ export default function Judgments() {
                                     <span className={`text-xs font-mono px-1.5 py-0.5 rounded-md ${
                                         activeTab === tab.key ? "bg-white/20" : "bg-muted"
                                     }`}>
-                                        {tabCounts[tab.key]!.toLocaleString("ar-SA")}
+                                        {tabCounts[tab.key]!.toLocaleString("en")}
                                     </span>
                                 )}
                             </button>
@@ -471,7 +471,7 @@ export default function Judgments() {
                     <div className="flex items-center justify-between mb-4">
                         <p className="text-sm text-muted-foreground">
                             {isSearching && <>نتائج البحث: </>}
-                            <span className="font-medium text-foreground">{data.pagination.total.toLocaleString("ar-SA")}</span> حكم
+                            <span className="font-medium text-foreground">{data.pagination.total.toLocaleString("en")}</span> حكم
                         </p>
                     </div>
                 )}
@@ -566,7 +566,7 @@ export default function Judgments() {
                         {data?.pagination && data.pagination.totalPages > 1 && (
                             <div className="flex justify-between items-center mt-6 pt-4 border-t">
                                 <p className="text-xs text-muted-foreground">
-                                    {((page - 1) * 20) + 1} - {Math.min(page * 20, data.pagination.total)} من {data.pagination.total.toLocaleString("ar-SA")}
+                                    {((page - 1) * 20) + 1} - {Math.min(page * 20, data.pagination.total)} من {data.pagination.total.toLocaleString("en")}
                                 </p>
                                 <div className="flex items-center gap-1.5">
                                     <Button

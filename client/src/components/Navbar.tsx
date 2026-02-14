@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Scale, Menu, BookOpen, Info, LogOut, User, FileText, Newspaper, Search, LayoutDashboard } from "lucide-react";
+import { Scale, Menu, BookOpen, LogOut, LogIn, User, Newspaper, Search, LayoutDashboard } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,10 @@ export function Navbar() {
   }, [setLocation]);
 
   const links = [
-    { href: "/search", label: "البحث", icon: Search },
+    { href: "/search", label: "البحث العميق", icon: Search },
     { href: "/library", label: "الأنظمة واللوائح", icon: BookOpen },
     { href: "/judgments", label: "الأحكام القضائية", icon: Scale },
     { href: "/gazette", label: "كشاف جريدة أم القرى", icon: Newspaper },
-    { href: "/about", label: "عن المنصة", icon: Info },
   ];
 
   return (
@@ -54,19 +53,34 @@ export function Navbar() {
               لوحة المسؤول
             </Link>
           )}
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`flex items-center gap-2 text-base font-medium transition-colors hover:text-primary ${location === link.href || (link.href === "/search" && location.startsWith("/search")) ? "text-primary" : "text-muted-foreground"}`}
-            >
-              <link.icon className="w-5 h-5" />
-              {link.label}
-            </Link>
-          ))}
+          {links.map((link) => {
+            const isActive = location === link.href || (link.href === "/search" && location.startsWith("/search"));
+            if (link.href === "/search") {
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex items-center gap-2 text-sm font-bold px-3.5 py-1.5 rounded-full bg-emerald-600 text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-700 transition-all"
+                >
+                  <link.icon className="w-4 h-4" />
+                  {link.label}
+                </Link>
+              );
+            }
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`flex items-center gap-2 text-base font-medium transition-colors hover:text-primary ${isActive ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <link.icon className="w-5 h-5" />
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
-        {/* Auth (Desktop) - Only show when authenticated */}
+        {/* Auth (Desktop) */}
         <div className="hidden md:flex items-center gap-2">
           {isLoading ? null : isAuthenticated ? (
             <div className="flex items-center gap-2">
@@ -85,7 +99,14 @@ export function Navbar() {
                 خروج
               </Button>
             </div>
-          ) : null}
+          ) : (
+            <Link href="/auth">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <LogIn className="w-4 h-4" />
+                تسجيل الدخول
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Mobile Nav */}
@@ -109,36 +130,61 @@ export function Navbar() {
                     لوحة المسؤول
                   </Link>
                 )}
-                {links.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setIsOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location === link.href ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}
-                  >
-                    <link.icon className="w-5 h-5" />
-                    {link.label}
-                  </Link>
-                ))}
+                {links.map((link) => {
+                  const isActive = location === link.href;
+                  if (link.href === "/search") {
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                      >
+                        <link.icon className="w-5 h-5" />
+                        {link.label}
+                      </Link>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}
+                    >
+                      <link.icon className="w-5 h-5" />
+                      {link.label}
+                    </Link>
+                  );
+                })}
               </nav>
-              {/* Only show logout in mobile menu when authenticated */}
-              {isAuthenticated && (
-                <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
-                  <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground">
-                    <User className="w-4 h-4" />
-                    {user?.firstName || user?.email || "مستخدم"}
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="justify-start gap-3"
-                    onClick={() => { logout(); setIsOpen(false); }}
-                    data-testid="button-logout-mobile"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    تسجيل خروج
-                  </Button>
-                </div>
-              )}
+              {/* Auth section in mobile menu */}
+              <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
+                {isAuthenticated ? (
+                  <>
+                    <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground">
+                      <User className="w-4 h-4" />
+                      {user?.firstName || user?.email || "مستخدم"}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="justify-start gap-3"
+                      onClick={() => { logout(); setIsOpen(false); }}
+                      data-testid="button-logout-mobile"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      تسجيل خروج
+                    </Button>
+                  </>
+                ) : (
+                  <Link href="/auth" onClick={() => setIsOpen(false)}>
+                    <Button variant="outline" className="w-full justify-start gap-3">
+                      <LogIn className="w-4 h-4" />
+                      تسجيل الدخول
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
           </SheetContent>
         </Sheet>

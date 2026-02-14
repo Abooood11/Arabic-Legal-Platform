@@ -65,7 +65,7 @@ export default function AuthPortal() {
     <div className="container mx-auto max-w-md py-10 px-4" dir="rtl">
       <Card>
         <CardHeader>
-          <CardTitle>بوابة الحسابات (مستخدم/مسؤول)</CardTitle>
+          <CardTitle>تسجيل الدخول</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">

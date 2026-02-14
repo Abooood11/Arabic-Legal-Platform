@@ -225,7 +225,7 @@ export default function GazetteIndex() {
                         <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1.5">
                                 <FileText className="h-4 w-4" />
-                                <span className="font-medium text-foreground">{data.pagination.total.toLocaleString("ar-SA")}</span> تشريع
+                                <span className="font-medium text-foreground">{data.pagination.total.toLocaleString("en")}</span> تشريع
                             </span>
                             {facets?.categories && (
                                 <span className="flex items-center gap-1.5">
@@ -273,7 +273,7 @@ export default function GazetteIndex() {
                                                 <SelectItem value="">جميع التصنيفات</SelectItem>
                                                 {facets?.categories?.map((c) => (
                                                     <SelectItem key={c.category} value={c.category}>
-                                                        {c.category} ({c.count.toLocaleString("ar-SA")})
+                                                        {c.category} ({c.count.toLocaleString("en")})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -287,7 +287,7 @@ export default function GazetteIndex() {
                                                 <SelectItem value="">جميع السنوات</SelectItem>
                                                 {facets?.years?.map((y) => (
                                                     <SelectItem key={y.year} value={y.year.toString()}>
-                                                        {y.year} ({y.count.toLocaleString("ar-SA")})
+                                                        {y.year} ({y.count.toLocaleString("en")})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -301,7 +301,7 @@ export default function GazetteIndex() {
                                                 <SelectItem value="">جميع السنوات</SelectItem>
                                                 {facets?.legislationYears?.map((y) => (
                                                     <SelectItem key={y.year} value={y.year}>
-                                                        {y.year} ({y.count.toLocaleString("ar-SA")})
+                                                        {y.year} ({y.count.toLocaleString("en")})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -341,7 +341,7 @@ export default function GazetteIndex() {
                         {/* Result count (compact) */}
                         {data?.pagination && (
                             <span className="text-xs text-muted-foreground">
-                                {data.pagination.total.toLocaleString("ar-SA")} نتيجة
+                                {data.pagination.total.toLocaleString("en")} نتيجة
                             </span>
                         )}
                     </div>
@@ -425,7 +425,7 @@ export default function GazetteIndex() {
                         {data?.pagination && data.pagination.totalPages > 1 && (
                             <div className="flex justify-between items-center mt-6 pt-4 border-t">
                                 <p className="text-xs text-muted-foreground">
-                                    {((page - 1) * 20) + 1} - {Math.min(page * 20, data.pagination.total)} من {data.pagination.total.toLocaleString("ar-SA")}
+                                    {((page - 1) * 20) + 1} - {Math.min(page * 20, data.pagination.total)} من {data.pagination.total.toLocaleString("en")}
                                 </p>
                                 <div className="flex items-center gap-1.5">
                                     <Button

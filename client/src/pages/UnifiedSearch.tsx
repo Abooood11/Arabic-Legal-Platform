@@ -140,6 +140,7 @@ export default function UnifiedSearch() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showAdvancedHelp, setShowAdvancedHelp] = useState(false);
   const [showFacets, setShowFacets] = useState(false);
+  const [exactSearch, setExactSearch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { recentSearches, addSearch, removeSearch, clearHistory } = useSearchHistory();
 
@@ -165,7 +166,7 @@ export default function UnifiedSearch() {
 
   // Main search query
   const { data, isLoading, isFetching } = useQuery<SearchResult>({
-    queryKey: ["unified-search", debouncedQuery, activeTab, page],
+    queryKey: ["unified-search", debouncedQuery, activeTab, page, exactSearch],
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
         q: debouncedQuery,
@@ -173,6 +174,7 @@ export default function UnifiedSearch() {
         page: page.toString(),
         limit: activeTab === "all" ? "5" : "15",
       });
+      if (exactSearch) params.set("exact", "true");
       const res = await fetch(`/api/search?${params}`, { signal });
       if (!res.ok) throw new Error("Search failed");
       return res.json();
@@ -271,7 +273,7 @@ export default function UnifiedSearch() {
       <div className="bg-gradient-to-b from-primary/5 to-background border-b">
         <div className="container mx-auto px-4 pt-8 pb-6">
           <div className="max-w-3xl mx-auto text-center mb-6">
-            <h1 className="text-3xl font-bold text-primary mb-2">البحث الموحد</h1>
+            <h1 className="text-3xl font-bold text-primary mb-2">البحث العميق</h1>
             <p className="text-muted-foreground text-sm">
               ابحث في الأنظمة والأحكام القضائية وكشاف أم القرى من مكان واحد
             </p>
@@ -280,11 +282,11 @@ export default function UnifiedSearch() {
               <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground/70">
                 <span className="flex items-center gap-1">
                   <Database className="h-3 w-3" />
-                  {stats.totalDocuments.toLocaleString("ar-SA")} وثيقة
+                  {stats.totalDocuments.toLocaleString("en")} وثيقة
                 </span>
-                <span>{stats.laws.laws.toLocaleString("ar-SA")} نظام</span>
-                <span>{stats.judgments.total.toLocaleString("ar-SA")} حكم</span>
-                <span>{stats.gazette.total.toLocaleString("ar-SA")} إصدار</span>
+                <span>{stats.laws.laws.toLocaleString("en")} نظام</span>
+                <span>{stats.judgments.total.toLocaleString("en")} حكم</span>
+                <span>{stats.gazette.total.toLocaleString("en")} إصدار</span>
               </div>
             )}
           </div>
@@ -327,6 +329,28 @@ export default function UnifiedSearch() {
               {!inputValue && (
                 <span className="text-[10px] text-muted-foreground/40 hidden md:block">
                   Ctrl+K
+                </span>
+              )}
+            </div>
+
+            {/* Exact Search Toggle */}
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <Button
+                variant={exactSearch ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => { setExactSearch(!exactSearch); setPage(1); }}
+              >
+                {exactSearch ? "✓ بحث حرفي" : "بحث حرفي"}
+              </Button>
+              {!exactSearch && inputValue && (
+                <span className="text-xs text-muted-foreground">
+                  💡 البحث يتوسع تلقائياً ليشمل المرادفات القانونية
+                </span>
+              )}
+              {exactSearch && (
+                <span className="text-xs text-primary font-medium">
+                  البحث الحرفي: النتائج مطابقة تماماً لما كتبته
                 </span>
               )}
             </div>
@@ -428,7 +452,7 @@ export default function UnifiedSearch() {
               <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
                   <Zap className="h-3.5 w-3.5 text-primary" />
-                  {data.totalResults.toLocaleString("ar-SA")} نتيجة
+                  {data.totalResults.toLocaleString("en")} نتيجة
                 </span>
                 <span>في {data.timeTaken} مللي ثانية</span>
                 {data.intent?.expandedTerms && data.intent.expandedTerms.length > 0 && (
@@ -494,7 +518,7 @@ export default function UnifiedSearch() {
                     <span className="sm:hidden">{tab.shortLabel}</span>
                     {isSearchActive && tabCounts[tab.key] > 0 && (
                       <Badge variant={activeTab === tab.key ? "secondary" : "outline"} className="text-[10px] h-5 px-1.5 mr-1">
-                        {tabCounts[tab.key].toLocaleString("ar-SA")}
+                        {tabCounts[tab.key].toLocaleString("en")}
                       </Badge>
                     )}
                   </button>
@@ -687,7 +711,7 @@ function FacetsSidebar({
                   className="flex items-center justify-between w-full px-2 py-1 rounded text-xs hover:bg-muted/50 transition-colors"
                 >
                   <span className="text-foreground">{c.city}</span>
-                  <span className="text-muted-foreground">{c.count.toLocaleString("ar-SA")}</span>
+                  <span className="text-muted-foreground">{c.count.toLocaleString("en")}</span>
                 </button>
               ))}
             </div>
@@ -709,7 +733,7 @@ function FacetsSidebar({
                   className="flex items-center justify-between w-full px-2 py-1 rounded text-xs hover:bg-muted/50 transition-colors"
                 >
                   <span className="text-foreground">{y.year}هـ</span>
-                  <span className="text-muted-foreground">{y.count.toLocaleString("ar-SA")}</span>
+                  <span className="text-muted-foreground">{y.count.toLocaleString("en")}</span>
                 </button>
               ))}
             </div>
@@ -731,7 +755,7 @@ function FacetsSidebar({
                   className="flex items-center justify-between w-full px-2 py-1 rounded text-xs hover:bg-muted/50 transition-colors"
                 >
                   <span className="text-foreground truncate max-w-[140px]">{c.category}</span>
-                  <span className="text-muted-foreground shrink-0">{c.count.toLocaleString("ar-SA")}</span>
+                  <span className="text-muted-foreground shrink-0">{c.count.toLocaleString("en")}</span>
                 </button>
               ))}
             </div>
@@ -794,7 +818,7 @@ function AllResultsView({ data, onTabChange }: { data: SearchResult; onTabChange
             <div className="flex items-center gap-2 text-primary font-bold">
               {section.icon}
               <span>{section.label}</span>
-              <Badge variant="outline" className="text-xs">{section.total.toLocaleString("ar-SA")}</Badge>
+              <Badge variant="outline" className="text-xs">{section.total.toLocaleString("en")}</Badge>
             </div>
             {section.total > 5 && (
               <button
@@ -989,7 +1013,7 @@ function Pagination({ page, totalPages, onChange }: { page: number; totalPages: 
             onClick={() => onChange(p as number)}
             className="w-9 h-9 p-0"
           >
-            {(p as number).toLocaleString("ar-SA")}
+            {(p as number).toLocaleString("en")}
           </Button>
         )
       )}

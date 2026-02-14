@@ -496,6 +496,7 @@ export async function registerRoutes(
       const startTime = Date.now();
       const q = (req.query.q as string || "").trim();
       const type = (req.query.type as string) || "all";
+      const exact = req.query.exact as string;
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
       const offset = (page - 1) * limit;
@@ -513,7 +514,10 @@ export async function registerRoutes(
       // Detect user intent for smarter results
       const intent = detectSearchIntent(q);
       const effectiveType = type !== "all" ? type : intent.type;
-      const ftsQuery = buildFtsQuery(q, intent.expandedTerms);
+      // Use literal FTS query for exact mode, otherwise smart query with synonym expansion
+      const ftsQuery = exact === "true"
+        ? buildLiteralFtsQuery(q)
+        : buildFtsQuery(q, intent.expandedTerms);
 
       // Search all sources - priority order affects "all" tab display
       const searchLaws = () => {
