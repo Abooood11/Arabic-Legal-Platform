@@ -279,7 +279,7 @@ export default function UnifiedSearch() {
             </p>
             {/* Database stats */}
             {stats && (
-              <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground/70">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground/70">
                 <span className="flex items-center gap-1">
                   <Database className="h-3 w-3" />
                   {stats.totalDocuments.toLocaleString("en")} وثيقة
@@ -297,7 +297,7 @@ export default function UnifiedSearch() {
             <Input
               ref={inputRef}
               placeholder='ابحث عن نظام، مادة قانونية، حكم قضائي... (استخدم "عبارة" للبحث الدقيق)'
-              className="pr-12 pl-20 h-14 text-lg rounded-2xl shadow-md border-2 focus:border-primary/50 transition-all"
+              className="pr-12 pl-24 sm:pl-20 h-14 text-base sm:text-lg rounded-2xl shadow-md border-2 focus:border-primary/50 transition-all"
               value={inputValue}
               onChange={(e) => {
                 setInputValue(e.target.value);
@@ -310,7 +310,7 @@ export default function UnifiedSearch() {
                 }
               }}
             />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-md px-1">
               {inputValue && (
                 <button
                   onClick={() => { setInputValue(""); inputRef.current?.focus(); }}
@@ -357,7 +357,7 @@ export default function UnifiedSearch() {
 
             {/* Advanced Search Help Panel */}
             {showAdvancedHelp && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-xl shadow-xl z-50 p-4">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-xl shadow-xl z-50 p-4 max-h-[70vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-sm text-primary flex items-center gap-2">
                     <SlidersHorizontal className="h-4 w-4" />
@@ -390,7 +390,7 @@ export default function UnifiedSearch() {
 
             {/* Suggestions Dropdown */}
             {showSuggestions && !isSearchActive && !showAdvancedHelp && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-xl shadow-xl z-50 overflow-hidden max-h-[70vh] overflow-y-auto">
                 {/* Recent Searches */}
                 {recentSearches.length > 0 && (
                   <div className="p-3 border-b">
@@ -399,20 +399,22 @@ export default function UnifiedSearch() {
                       <button onClick={clearHistory} className="text-xs text-primary hover:underline">مسح</button>
                     </div>
                     {recentSearches.slice(0, 5).map((search, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSearch(search)}
-                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 text-sm text-right"
-                      >
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span className="flex-1 truncate">{search}</span>
+                      <div key={i} className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 text-sm">
                         <button
-                          onClick={(e) => { e.stopPropagation(); removeSearch(search); }}
-                          className="text-muted-foreground/50 hover:text-destructive"
+                          onClick={() => handleSearch(search)}
+                          className="flex items-center gap-2 flex-1 min-w-0 text-right"
+                        >
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="flex-1 truncate">{search}</span>
+                        </button>
+                        <button
+                          onClick={() => removeSearch(search)}
+                          className="text-muted-foreground/50 hover:text-destructive shrink-0"
+                          aria-label={`حذف البحث ${search}`}
                         >
                           <X className="h-3 w-3" />
                         </button>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -502,7 +504,7 @@ export default function UnifiedSearch() {
           <>
             {/* Tabs + Facet Toggle */}
             <div className="border-b bg-background sticky top-20 z-20 mb-6 -mx-4 px-4">
-              <div className="flex items-center gap-1.5 py-2 overflow-x-auto max-w-4xl mx-auto">
+              <div className="flex items-center gap-1.5 py-2 overflow-x-auto max-w-4xl mx-auto scrollbar-thin">
                 {TABS.map((tab) => (
                   <button
                     key={tab.key}
@@ -528,7 +530,7 @@ export default function UnifiedSearch() {
                 {data && (data.facets.years.length > 0 || data.facets.cities.length > 0 || data.facets.categories.length > 0) && (
                   <button
                     onClick={() => setShowFacets(!showFacets)}
-                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap mr-auto ${
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ms-auto shrink-0 ${
                       showFacets ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
                     }`}
                   >
@@ -541,7 +543,7 @@ export default function UnifiedSearch() {
             </div>
 
             {/* Results Layout */}
-            <div className="max-w-4xl mx-auto flex gap-6">
+            <div className="max-w-4xl mx-auto flex flex-col lg:flex-row gap-6">
               {/* Main Results */}
               <div className="flex-1 min-w-0 relative">
                 {isFetching && !isLoading && (
