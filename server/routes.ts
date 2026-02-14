@@ -15,6 +15,7 @@ const isAuthenticated: RequestHandler = (req, res, next) => {
 import { db, sqlite } from "./db";
 import { articleOverrides, errorReports, judgments, gazetteIndex } from "@shared/schema";
 import { eq, and, desc, sql, like } from "drizzle-orm";
+import { readLatestLegalMonitoringReport, runLegalMonitoringScan } from "./legalMonitoring";
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
 
 const isAdmin: RequestHandler = async (req, res, next) => {
@@ -434,6 +435,30 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching error reports:", error);
       res.status(500).json({ message: "Failed to fetch error reports" });
+    }
+  });
+
+  app.get("/api/legal-monitoring/report", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const report = await readLatestLegalMonitoringReport();
+      if (!report) {
+        return res.status(404).json({ message: "No legal monitoring report found yet" });
+      }
+
+      res.json({ report });
+    } catch (error) {
+      console.error("Error reading legal monitoring report:", error);
+      res.status(500).json({ message: "Failed to read legal monitoring report" });
+    }
+  });
+
+  app.post("/api/legal-monitoring/run", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const report = await runLegalMonitoringScan();
+      res.json({ success: true, report });
+    } catch (error) {
+      console.error("Error running legal monitoring:", error);
+      res.status(500).json({ message: "Failed to run legal monitoring scan" });
     }
   });
 
