@@ -27,6 +27,9 @@ export function fixArabicDate(text: string): string {
         .replace(/(1[34]\d{2}\/)ه(\/\d{1,2})/g, '$15$2')
         // Fix / → - for Arabic-Indic digits (prevents BiDi visual reversal)
         .replace(/([٠-٩]{1,4})\/([٠-٩]{1,2})\/([٠-٩]{1,4})/g, '$1-$2-$3')
+        // Fix / → - for Western digits in Hijri dates
+        .replace(/(1[34]\d{2})\/(\d{1,2})\/(\d{1,2})/g, '$1-$2-$3')
+        .replace(/(\d{1,2})\/(\d{1,2})\/(1[34]\d{2})/g, '$1-$2-$3')
         // Fix OCR هو → هـ after dates
         .replace(/([\d٠-٩]+[\/\-.][\d٠-٩]+[\/\-.][\d٠-٩]+)\s*هو(?=[^٠-٩\w]|$)/g, '$1هـ');
 }
@@ -477,6 +480,7 @@ const OCR_DISPLAY_FIXES: [RegExp, string][] = [
     [/مستئند الحكم/g, "مستند الحكم"],
     [/مستند المحاكم/g, "مستند الحكم"],
     [/مسنتد الحكم/g, "مستند الحكم"],
+    [/فنسختتم الحكيان/g, "مستند الحكم"],
     [/www\.\w+\.com/g, ""],
     [/0AE/g, ""],
 ];
@@ -600,7 +604,7 @@ export function parseBogMetadata(text: string, source?: string, caseId?: string,
         // Split by letter prefix (أ. ب. ج.) or numbered items
         const items = principlesBlock.split(/\n(?=[أ-ي][.\-]\s|[١٢٣٤٥٦٧٨٩0-9]+[.\-]\s)/);
         for (const item of items) {
-            const cleaned = item.trim().replace(/^[أ-ي][.\-]\s*/, '').trim();
+            const cleaned = item.trim().replace(/^[أ-ي][.\-]\s*/, '').replace(/^#{1,3}\s*/, '').trim();
             if (cleaned.length > 10) {
                 principles.push(cleaned);
             }
@@ -610,7 +614,7 @@ export function parseBogMetadata(text: string, source?: string, caseId?: string,
             // Try splitting by ## headers
             const subItems = principlesBlock.split(/\n##\s*/);
             for (const item of subItems) {
-                const cleaned = item.trim();
+                const cleaned = item.trim().replace(/^#{1,3}\s*/, '').trim();
                 if (cleaned.length > 10) {
                     principles.push(cleaned);
                 }
@@ -626,7 +630,7 @@ export function parseBogMetadata(text: string, source?: string, caseId?: string,
         const basisBlock = basisMatch[1].trim();
         const items = basisBlock.split(/\n(?=[-–•]\s|المادة)/);
         for (const item of items) {
-            const cleaned = item.trim().replace(/^[-–•]\s*/, '').trim();
+            const cleaned = item.trim().replace(/^[-–•]\s*/, '').replace(/^#{1,3}\s*/, '').trim();
             if (cleaned.length > 5) {
                 legalBasis.push(cleaned);
             }

@@ -123,6 +123,11 @@ function findDividerMatch(text: string, div: typeof SECTION_DIVIDERS[0]): { inde
                 const before = text.substring(Math.max(0, m.index - 15), m.index);
                 if (before.includes("هذا") || before.includes("منطوق") || before.includes("والحكم")) continue;
             }
+            // Skip "منطوق الحكم" when the matched "حكمت" is actually an appeal ruling (بتأييد)
+            if (div.label === "منطوق الحكم" && pat.source.includes("حكمت")) {
+                const after = text.substring(m.index, m.index + m[0].length + 40);
+                if (/حكمت\s+(?:المحكمة|الهيئة|الدائرة)\s+بتأييد/.test(after)) continue;
+            }
             if (!best || m.index < best.index) {
                 best = { index: m.index, length: m[0].length };
             }
@@ -270,6 +275,25 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
         // Sort by position AND remove any that overlap or appear in wrong order
         headers.sort((a, b) => a.index - b.index);
 
+        // Remove overlapping headers: if two dividers match overlapping text ranges,
+        // keep only one. When "حكم الاستئناف" overlaps with "منطوق الحكم", prefer "حكم الاستئناف"
+        // because it is more specific (indicates an appeal ruling, not just a generic ruling).
+        for (let i = 0; i < headers.length - 1; i++) {
+            const curr = headers[i];
+            const next = headers[i + 1];
+            const currEnd = curr.index + curr.length;
+            // Check if headers overlap (one starts before the other ends)
+            if (next.index < currEnd || Math.abs(next.index - curr.index) < 20) {
+                // If next is "حكم الاستئناف", it's more specific — remove current
+                if (next.config.label === "حكم الاستئناف") {
+                    headers.splice(i, 1);
+                } else {
+                    headers.splice(i + 1, 1);
+                }
+                i--; // re-check from same position
+            }
+        }
+
         if (headers.length === 0) {
             // No headers found - return entire text as one segment
             return [{ type: "text" as const, content: cleanText, config: null as typeof SECTION_DIVIDERS[0] | null }];
@@ -384,8 +408,10 @@ function BogMetadataPanel({ meta }: { meta: BogMetadata }) {
                     <div className="space-y-2">
                         {meta.principles.map((principle, i) => (
                             <div key={i} className="flex gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/10">
-                                <span className="text-primary font-bold text-sm mt-0.5 shrink-0">{'أبجدهوزحطيكلمنسعفصقرشتثخذضظغ'[i] || String(i + 1)}.</span>
-                                <span className="text-sm leading-relaxed text-foreground">{principle}</span>
+                                {meta.principles.length > 1 && (
+                                    <span className="text-primary font-bold text-sm mt-0.5 shrink-0">{'أبجدهوزحطيكلمنسعفصقرشتثخذضظغ'[i] || String(i + 1)}.</span>
+                                )}
+                                <span className="text-sm leading-relaxed text-foreground text-justify">{fixArabicDate(principle)}</span>
                             </div>
                         ))}
                     </div>
@@ -403,7 +429,7 @@ function BogMetadataPanel({ meta }: { meta: BogMetadata }) {
                         {meta.legalBasis.map((basis, i) => (
                             <li key={i} className="flex gap-2 text-sm text-foreground leading-relaxed">
                                 <span className="text-primary mt-1 shrink-0">•</span>
-                                <span>{basis}</span>
+                                <span className="text-justify">{fixArabicDate(basis)}</span>
                             </li>
                         ))}
                     </ul>
