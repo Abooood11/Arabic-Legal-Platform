@@ -104,6 +104,15 @@ const TABS: { key: SourceTab; label: string; shortLabel: string; icon: React.Rea
     },
 ];
 
+const SAUDI_LEGAL_QUERIES = [
+    "\"مبدأ قضائي\"",
+    "مادة 77 عقد العمل",
+    "تعويض ضرر",
+    "فسخ عقد",
+    "نفقة حضانة",
+    "سند تنفيذي",
+];
+
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
     useEffect(() => {
@@ -153,7 +162,7 @@ function SourceBadge({ source }: { source?: string }) {
 
 export default function Judgments() {
     const [location, setLocation] = useLocation();
-    const [activeTab, setActiveTab] = useState<SourceTab>("");
+    const [activeTab, setActiveTab] = useState<SourceTab>("sa_judicial");
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState("");
     const [cityFilter, setCityFilter] = useState("");
@@ -162,6 +171,7 @@ export default function Judgments() {
     const [sort, setSort] = useState("date");
     const [filterOpen, setFilterOpen] = useState(false);
     const [judgeFilter, setJudgeFilter] = useState("");
+    const [exactSearch, setExactSearch] = useState(false);
 
     // Read judge param from URL on mount
     useEffect(() => {
@@ -181,7 +191,7 @@ export default function Judgments() {
 
     const debouncedSearch = useDebounce(search, 400);
 
-    useEffect(() => { setPage(1); }, [debouncedSearch, cityFilter, courtFilter, yearFilter, activeTab, judgeFilter]);
+    useEffect(() => { setPage(1); }, [debouncedSearch, cityFilter, courtFilter, yearFilter, activeTab, judgeFilter, exactSearch]);
     useEffect(() => { setCityFilter(""); setCourtFilter(""); setYearFilter(""); }, [activeTab]);
 
     const queryParams = useMemo(() => {
@@ -192,8 +202,9 @@ export default function Judgments() {
         if (yearFilter) params.set("year", yearFilter);
         if (activeTab) params.set("source", activeTab);
         if (judgeFilter) params.set("judge", judgeFilter);
+        if (exactSearch) params.set("exact", "true");
         return params.toString();
-    }, [page, debouncedSearch, cityFilter, courtFilter, yearFilter, activeTab, sort, judgeFilter]);
+    }, [page, debouncedSearch, cityFilter, courtFilter, yearFilter, activeTab, sort, judgeFilter, exactSearch]);
 
     const { data, isLoading, isFetching } = useQuery<JudgmentsResponse>({
         queryKey: ["judgments", queryParams],
@@ -284,6 +295,33 @@ export default function Judgments() {
                             </button>
                         )}
                     </div>
+                    <div className="mt-3">
+                        <Button
+                            type="button"
+                            variant={exactSearch ? "default" : "outline"}
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => setExactSearch((v) => !v)}
+                        >
+                            <Search className="h-3.5 w-3.5" />
+                            بحث حرفي
+                        </Button>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">بحث شائع للمحامي السعودي:</span>
+                        {SAUDI_LEGAL_QUERIES.map((preset) => (
+                            <button
+                                key={preset}
+                                onClick={() => setSearch(preset)}
+                                className="rounded-full border bg-background px-3 py-1 hover:border-primary hover:text-primary transition-colors"
+                            >
+                                {preset}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        يدعم البحث العبارات الدقيقة بين علامتي تنصيص مثل "مبدأ قضائي"، كما يحاول توسيع المصطلحات القانونية الشائعة تلقائيًا.
+                    </p>
                 </div>
             </div>
 

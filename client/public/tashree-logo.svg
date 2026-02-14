@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="120" y1="360" x2="390" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#43A047"/>
+      <stop offset="1" stop-color="#66BB6A"/>
+    </linearGradient>
+  </defs>
+  <rect x="78" y="78" width="356" height="356" rx="22" stroke="#1F7A43" stroke-width="8"/>
+  <text x="256" y="208" text-anchor="middle" fill="#1F7A43" font-size="90" font-family="'Noto Kufi Arabic', 'Cairo', sans-serif" font-weight="700">تشريع</text>
+  <rect x="110" y="260" width="292" height="12" rx="6" fill="url(#g)"/>
+  <rect x="110" y="305" width="220" height="32" rx="16" fill="url(#g)"/>
+  <rect x="348" y="305" width="54" height="32" rx="10" fill="#E7EDE6"/>
+  <rect x="110" y="370" width="145" height="16" rx="8" fill="url(#g)"/>
+  <rect x="255" y="370" width="147" height="16" rx="8" fill="#E7EDE6"/>
+</svg>

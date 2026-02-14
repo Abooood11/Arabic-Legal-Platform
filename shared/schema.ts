@@ -45,7 +45,8 @@ export const crossSimilarSchema = z.object({
 
 export const paragraphSchema = z.object({
   marker: z.string(),
-  text: z.string()
+  text: z.string(),
+  level: z.number().optional()
 });
 
 export const regulationSchema: z.ZodType<any> = z.lazy(() => z.object({
@@ -64,7 +65,8 @@ export const articleSchema = z.object({
   cross_similar: z.array(crossSimilarSchema).optional(),
   number_text: z.string().optional(),
   paragraphs: z.array(paragraphSchema).optional(),
-  regulations: z.array(regulationSchema).optional()
+  regulations: z.array(regulationSchema).optional(),
+  status: z.string().optional()
 });
 
 export const royalDecreeSchema = z.object({
@@ -117,3 +119,5 @@ export * from "./models/articleOverrides";
 export * from "./models/errorReports";
 export * from "./models/judgments";
 export * from "./models/gazetteIndex";
+
+export * from "./models/chat";

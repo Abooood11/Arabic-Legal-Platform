@@ -1,0 +1,355 @@
+import type { Express, Request, RequestHandler } from "express";
+import crypto from "crypto";
+import { sqlite } from "./db";
+
+const ACCESS_COOKIE = "alp_access";
+const REFRESH_COOKIE = "alp_refresh";
+const ACCESS_TTL_SECONDS = 15 * 60;
+const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
+const JWT_SECRET = process.env.AUTH_JWT_SECRET || "dev-change-me";
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((v) => v.trim().toLowerCase()).filter(Boolean);
+
+function nowUnix() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function base64Url(input: Buffer | string) {
+  return Buffer.from(input).toString("base64url");
+}
+
+function signJwt(payload: Record<string, unknown>, expSeconds: number) {
+  const header = base64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const exp = nowUnix() + expSeconds;
+  const body = base64Url(JSON.stringify({ ...payload, exp }));
+  const data = `${header}.${body}`;
+  const sig = crypto.createHmac("sha256", JWT_SECRET).update(data).digest("base64url");
+  return `${data}.${sig}`;
+}
+
+function verifyJwt(token?: string | null): null | Record<string, any> {
+  if (!token) return null;
+  const [header, body, sig] = token.split(".");
+  if (!header || !body || !sig) return null;
+  const data = `${header}.${body}`;
+  const expected = crypto.createHmac("sha256", JWT_SECRET).update(data).digest("base64url");
+  if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig))) return null;
+  const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+  if (!payload.exp || nowUnix() > payload.exp) return null;
+  return payload;
+}
+
+function randomToken(bytes = 48) {
+  return crypto.randomBytes(bytes).toString("base64url");
+}
+
+function hashToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function hashPassword(password: string, salt?: string) {
+  const actualSalt = salt || crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, actualSalt, 64).toString("hex");
+  return { salt: actualSalt, hash };
+}
+
+function verifyPassword(password: string, salt: string, hash: string) {
+  const candidate = crypto.scryptSync(password, salt, 64).toString("hex");
+  return crypto.timingSafeEqual(Buffer.from(candidate, "hex"), Buffer.from(hash, "hex"));
+}
+
+function parseCookies(req: Request) {
+  const cookieHeader = req.headers.cookie || "";
+  return Object.fromEntries(cookieHeader.split(";").map((part) => part.trim()).filter(Boolean).map((part) => {
+    const idx = part.indexOf("=");
+    return [part.slice(0, idx), decodeURIComponent(part.slice(idx + 1))];
+  }));
+}
+
+function setCookie(res: any, key: string, value: string, maxAgeSec: number) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  res.append("Set-Cookie", `${key}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${secure}`);
+}
+
+function clearCookie(res: any, key: string) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  res.append("Set-Cookie", `${key}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+}
+
+function encodeBase32(buf: Buffer) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0;
+  let value = 0;
+  let output = "";
+  for (let i = 0; i < buf.length; i++) {
+    const b = buf[i];
+    value = (value << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      output += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) output += alphabet[(value << (5 - bits)) & 31];
+  return output;
+}
+
+function decodeBase32(input: string) {
+  const clean = input.replace(/=+$/, "").toUpperCase().replace(/\s+/g, "");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0;
+  let value = 0;
+  const out: number[] = [];
+  for (const ch of clean) {
+    const idx = alphabet.indexOf(ch);
+    if (idx < 0) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(out);
+}
+
+function createTotp(secretBase32: string, step = 30) {
+  const key = decodeBase32(secretBase32);
+  const counter = Math.floor(Date.now() / 1000 / step);
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(counter));
+  const hmac = crypto.createHmac("sha1", key).update(msg).digest();
+  const offset = hmac[hmac.length - 1] & 0xf;
+  const code = ((hmac.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, "0");
+  return code;
+}
+
+function verifyTotp(secretBase32: string, code: string) {
+  const normalized = code.replace(/\s+/g, "");
+  if (!/^\d{6}$/.test(normalized)) return false;
+  const key = decodeBase32(secretBase32);
+  const current = Math.floor(Date.now() / 1000 / 30);
+  for (let drift = -1; drift <= 1; drift++) {
+    const msg = Buffer.alloc(8);
+    msg.writeBigUInt64BE(BigInt(current + drift));
+    const hmac = crypto.createHmac("sha1", key).update(msg).digest();
+    const offset = hmac[hmac.length - 1] & 0xf;
+    const expected = ((hmac.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, "0");
+    if (expected === normalized) return true;
+  }
+  return false;
+}
+
+function issueTokens(res: any, user: { id: string; role: string }, userAgent?: string, ip?: string) {
+  const sessionId = crypto.randomUUID();
+  const refreshToken = randomToken();
+  const refreshHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + REFRESH_TTL_SECONDS * 1000).toISOString();
+
+  sqlite.prepare(`
+    INSERT INTO auth_sessions (id, user_id, refresh_token_hash, user_agent, ip_address, expires_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(sessionId, user.id, refreshHash, userAgent || null, ip || null, expiresAt);
+
+  const access = signJwt({ sub: user.id, role: user.role, sid: sessionId }, ACCESS_TTL_SECONDS);
+  setCookie(res, ACCESS_COOKIE, access, ACCESS_TTL_SECONDS);
+  setCookie(res, REFRESH_COOKIE, refreshToken, REFRESH_TTL_SECONDS);
+}
+
+function getCurrentUser(req: Request) {
+  const cookies = parseCookies(req);
+  const payload = verifyJwt(cookies[ACCESS_COOKIE]);
+  if (!payload?.sub) return null;
+  const row = sqlite.prepare(`
+    SELECT u.id, u.email, u.first_name as firstName, u.last_name as lastName, a.role, a.subscription_tier as subscriptionTier,
+      a.subscription_status as subscriptionStatus, a.mfa_enabled as mfaEnabled
+    FROM users u
+    JOIN app_users a ON a.user_id = u.id
+    WHERE u.id = ?
+  `).get(payload.sub) as any;
+  if (!row) return null;
+  return { ...row, sid: payload.sid };
+}
+
+export const isAuthenticated: RequestHandler = (req, res, next) => {
+  const user = getCurrentUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  (req as any).user = { claims: { sub: user.id }, role: user.role, profile: user };
+  next();
+};
+
+export const isAdmin: RequestHandler = (req, res, next) => {
+  if ((req as any).user?.role !== "admin") return res.status(403).json({ message: "Forbidden" });
+  next();
+};
+
+export function setupAuthSchema() {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE,
+      first_name TEXT,
+      last_name TEXT,
+      profile_image_url TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid TEXT PRIMARY KEY,
+      sess TEXT NOT NULL,
+      expire TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions(expire);
+
+    CREATE TABLE IF NOT EXISTS app_users (
+      user_id TEXT PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user',
+      status TEXT NOT NULL DEFAULT 'active',
+      mfa_enabled INTEGER NOT NULL DEFAULT 0,
+      mfa_secret TEXT,
+      mfa_pending_secret TEXT,
+      subscription_tier TEXT NOT NULL DEFAULT 'free',
+      subscription_status TEXT NOT NULL DEFAULT 'inactive',
+      subscription_expires_at TEXT,
+      payment_customer_id TEXT,
+      last_login_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      refresh_token_hash TEXT NOT NULL,
+      user_agent TEXT,
+      ip_address TEXT,
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
+
+    CREATE TABLE IF NOT EXISTS login_audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT,
+      user_id TEXT,
+      action TEXT NOT NULL,
+      success INTEGER NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+}
+
+export function registerAuthRoutes(app: Express) {
+  app.post("/api/auth/register", (req, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const firstName = String(req.body?.firstName || "").trim();
+    const lastName = String(req.body?.lastName || "").trim();
+
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: "Invalid email" });
+    if (password.length < 10 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      return res.status(400).json({ message: "Password must be at least 10 chars and include uppercase, lowercase, number, and symbol" });
+    }
+
+    const exists = sqlite.prepare("SELECT id FROM users WHERE email = ?").get(email);
+    if (exists) return res.status(409).json({ message: "Email already registered" });
+
+    const userId = crypto.randomUUID();
+    const { hash, salt } = hashPassword(password);
+    const role = ADMIN_EMAILS.includes(email) ? "admin" : "user";
+
+    sqlite.prepare("INSERT INTO users (id, email, first_name, last_name, created_at, updated_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))")
+      .run(userId, email, firstName || null, lastName || null);
+
+    sqlite.prepare("INSERT INTO app_users (user_id, password_hash, password_salt, role, subscription_tier, subscription_status) VALUES (?, ?, ?, ?, 'free', 'inactive')")
+      .run(userId, hash, salt, role);
+
+    issueTokens(res, { id: userId, role }, req.headers["user-agent"] as string, req.ip);
+    res.json({ success: true, user: { id: userId, email, firstName, lastName, role, subscriptionTier: "free", subscriptionStatus: "inactive" } });
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const totpCode = String(req.body?.totpCode || "").trim();
+
+    const row = sqlite.prepare(`
+      SELECT u.id, u.email, u.first_name as firstName, u.last_name as lastName,
+             a.password_hash as passwordHash, a.password_salt as passwordSalt, a.role,
+             a.mfa_enabled as mfaEnabled, a.mfa_secret as mfaSecret,
+             a.subscription_tier as subscriptionTier, a.subscription_status as subscriptionStatus
+      FROM users u JOIN app_users a ON a.user_id = u.id WHERE u.email = ?
+    `).get(email) as any;
+
+    if (!row || !verifyPassword(password, row.passwordSalt, row.passwordHash)) {
+      sqlite.prepare("INSERT INTO login_audit_logs (email, action, success, ip_address, user_agent) VALUES (?, 'login', 0, ?, ?)")
+        .run(email || null, req.ip || null, (req.headers["user-agent"] as string) || null);
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    if (row.mfaEnabled && !verifyTotp(row.mfaSecret, totpCode)) {
+      return res.status(401).json({ message: "MFA code required or invalid", mfaRequired: true });
+    }
+
+    sqlite.prepare("UPDATE app_users SET last_login_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ?").run(row.id);
+    sqlite.prepare("INSERT INTO login_audit_logs (email, user_id, action, success, ip_address, user_agent) VALUES (?, ?, 'login', 1, ?, ?)")
+      .run(email, row.id, req.ip || null, (req.headers["user-agent"] as string) || null);
+
+    issueTokens(res, { id: row.id, role: row.role }, req.headers["user-agent"] as string, req.ip);
+    res.json({ success: true, user: { id: row.id, email: row.email, firstName: row.firstName, lastName: row.lastName, role: row.role, subscriptionTier: row.subscriptionTier, subscriptionStatus: row.subscriptionStatus, mfaEnabled: !!row.mfaEnabled } });
+  });
+
+  app.post("/api/auth/logout", isAuthenticated, (req, res) => {
+    const sid = (req as any).user?.profile?.sid;
+    if (sid) sqlite.prepare("UPDATE auth_sessions SET revoked_at = datetime('now') WHERE id = ?").run(sid);
+    clearCookie(res, ACCESS_COOKIE);
+    clearCookie(res, REFRESH_COOKIE);
+    res.json({ success: true });
+  });
+
+  app.get("/api/auth/user", isAuthenticated, (req, res) => {
+    const profile = (req as any).user?.profile;
+    res.json(profile);
+  });
+
+  app.get("/api/auth/admin-status", isAuthenticated, (req, res) => {
+    res.json({ isAdmin: (req as any).user?.role === "admin" });
+  });
+
+  app.post("/api/auth/mfa/setup", isAuthenticated, (req, res) => {
+    const userId = (req as any).user.claims.sub;
+    const secret = encodeBase32(crypto.randomBytes(20));
+    sqlite.prepare("UPDATE app_users SET mfa_pending_secret = ?, updated_at = datetime('now') WHERE user_id = ?").run(secret, userId);
+    const email = (req as any).user?.profile?.email || "account";
+    const otpauth = `otpauth://totp/ArabicLegalPlatform:${encodeURIComponent(email)}?secret=${secret}&issuer=ArabicLegalPlatform&algorithm=SHA1&digits=6&period=30`;
+    res.json({ secret, otpauth });
+  });
+
+  app.post("/api/auth/mfa/verify", isAuthenticated, (req, res) => {
+    const userId = (req as any).user.claims.sub;
+    const code = String(req.body?.code || "");
+    const row = sqlite.prepare("SELECT mfa_pending_secret as pending FROM app_users WHERE user_id = ?").get(userId) as any;
+    if (!row?.pending) return res.status(400).json({ message: "No MFA setup in progress" });
+    if (!verifyTotp(row.pending, code)) return res.status(400).json({ message: "Invalid MFA code" });
+    sqlite.prepare("UPDATE app_users SET mfa_secret = mfa_pending_secret, mfa_pending_secret = NULL, mfa_enabled = 1, updated_at = datetime('now') WHERE user_id = ?").run(userId);
+    res.json({ success: true });
+  });
+
+  app.get("/api/auth/subscription/me", isAuthenticated, (req, res) => {
+    const userId = (req as any).user.claims.sub;
+    const data = sqlite.prepare(`
+      SELECT subscription_tier as tier, subscription_status as status, subscription_expires_at as expiresAt, payment_customer_id as customerId
+      FROM app_users WHERE user_id = ?
+    `).get(userId);
+    res.json({ subscription: data });
+  });
+}
