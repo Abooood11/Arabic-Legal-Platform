@@ -1,15 +1,41 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="400" height="140" viewBox="0 0 400 140" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="g" x1="120" y1="360" x2="390" y2="360" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#43A047"/>
-      <stop offset="1" stop-color="#66BB6A"/>
+    <linearGradient id="g1" x1="50" y1="30" x2="380" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#145A2C"/>
+      <stop offset="0.5" stop-color="#1B6B3A"/>
+      <stop offset="1" stop-color="#1F7A40"/>
     </linearGradient>
+    <linearGradient id="lg1" x1="0" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E8B57" stop-opacity="0.1"/>
+      <stop offset="0.6" stop-color="#1B6B3A" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#145A2C"/>
+    </linearGradient>
+    <linearGradient id="lg2" x1="0" y1="0" x2="155" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E8B57" stop-opacity="0.05"/>
+      <stop offset="0.4" stop-color="#2E8B57" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#1B6B3A"/>
+    </linearGradient>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&amp;display=swap');
+    </style>
   </defs>
-  <rect x="78" y="78" width="356" height="356" rx="22" stroke="#1F7A43" stroke-width="8"/>
-  <text x="256" y="208" text-anchor="middle" fill="#1F7A43" font-size="90" font-family="'Noto Kufi Arabic', 'Cairo', sans-serif" font-weight="700">تشريع</text>
-  <rect x="110" y="260" width="292" height="12" rx="6" fill="url(#g)"/>
-  <rect x="110" y="305" width="220" height="32" rx="16" fill="url(#g)"/>
-  <rect x="348" y="305" width="54" height="32" rx="10" fill="#E7EDE6"/>
-  <rect x="110" y="370" width="145" height="16" rx="8" fill="url(#g)"/>
-  <rect x="255" y="370" width="147" height="16" rx="8" fill="#E7EDE6"/>
+
+  <!-- Three decorative horizontal lines -->
+  <rect x="10" y="42" width="128" height="7" rx="3.5" fill="url(#lg1)"/>
+  <rect x="22" y="57" width="138" height="7" rx="3.5" fill="url(#lg2)"/>
+  <rect x="10" y="72" width="128" height="7" rx="3.5" fill="url(#lg1)"/>
+
+  <!-- Elegant swoosh connecting lines to text -->
+  <path d="M148 45 C168 45, 182 52, 188 65 C194 78, 190 92, 180 102"
+        stroke="url(#g1)" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Arabic text "تشريع" using Aref Ruqaa font -->
+  <text x="300" y="105"
+        font-family="'Aref Ruqaa', 'Amiri', 'Scheherazade New', 'Traditional Arabic', serif"
+        font-size="82"
+        font-weight="700"
+        fill="url(#g1)"
+        text-anchor="middle"
+        direction="rtl"
+        letter-spacing="-1">تشريع</text>
 </svg>

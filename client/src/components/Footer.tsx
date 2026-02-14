@@ -44,9 +44,8 @@ export function Footer() {
         <div className="container mx-auto px-4 py-12 md:py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2 space-y-4">
-              <Link href="/library" className="flex items-center gap-2 font-bold text-xl text-primary" data-testid="link-footer-logo">
-                <Scale className="h-6 w-6" />
-                <span>تشريع</span>
+              <Link href="/library" className="flex items-center" data-testid="link-footer-logo">
+                <img src="/tashree-logo.png" alt="شعار تشريع" className="h-10 object-contain" style={{ width: 'auto' }} />
               </Link>
               <p className="text-muted-foreground leading-relaxed max-w-sm">
                 منصة رقمية مخصصة لعرض النصوص القانونية السعودية وخدمتها، مع أدوات ذكية للوصول المباشر للمصادر الرسمية المعتمدة.
