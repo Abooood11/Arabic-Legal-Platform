@@ -964,22 +964,22 @@ export async function registerRoutes(
     }
   });
 
-  // Trending searches (most popular queries in last 7 days)
+  // Public trending endpoint is privacy-safe: returns curated legal topics only
   app.get("/api/search/trending", async (req, res) => {
     try {
-      const trending = sqlite.prepare(`
-        SELECT query_normalized as query, count(*) as count
-        FROM search_logs
-        WHERE created_at >= datetime('now', '-7 days')
-          AND has_results = 1
-          AND length(query_normalized) >= 3
-        GROUP BY query_normalized
-        ORDER BY count DESC
-        LIMIT 10
-      `).all() as any[];
+      const safeTrending = [
+        "نظام العمل",
+        "العقود",
+        "الإثبات",
+        "الشركات",
+        "التنفيذ",
+        "الإيجار",
+        "التعويض",
+        "التحكيم",
+      ].map((query, index) => ({ query, count: 8 - index }));
 
       res.set("Cache-Control", "public, max-age=300");
-      res.json(trending);
+      res.json(safeTrending);
     } catch {
       res.json([]);
     }

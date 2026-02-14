@@ -194,7 +194,7 @@ export default function UnifiedSearch() {
     staleTime: 3600000,
   });
 
-  // Trending searches (most popular in last 7 days)
+  // Privacy-safe suggested topics (served from curated list)
   const { data: trending } = useQuery<TrendingSearch[]>({
     queryKey: ["search-trending"],
     queryFn: async () => {
@@ -605,12 +605,12 @@ export default function UnifiedSearch() {
               ابحث في الأنظمة واللوائح والأحكام القضائية وكشاف أم القرى
             </p>
 
-            {/* Trending searches - from real user data */}
+            {/* Suggested legal topics */}
             {trending && trending.length > 0 && (
               <div className="mb-6">
                 <p className="text-xs text-muted-foreground mb-3 flex items-center justify-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                  الأكثر بحثاً هذا الأسبوع
+                  موضوعات شائعة
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {trending.slice(0, 8).map((t, i) => (
@@ -620,7 +620,6 @@ export default function UnifiedSearch() {
                       className="px-3 py-1.5 rounded-full text-sm bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors border border-primary/10 flex items-center gap-1.5"
                     >
                       <span>{t.query}</span>
-                      <span className="text-[10px] text-muted-foreground/60">{t.count}</span>
                     </button>
                   ))}
                 </div>
