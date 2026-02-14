@@ -35,7 +35,7 @@ export function useLaw(id: string) {
     queryKey: [api.laws.get.path, id],
     queryFn: async () => {
       const url = buildUrl(api.laws.get.path, { id });
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) {
         if (res.status === 404) return null;
         throw new Error("Failed to fetch law");

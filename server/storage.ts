@@ -1,6 +1,7 @@
 import { Source, LibraryItem, Law } from "@shared/schema";
 import fs from "fs/promises";
 import path from "path";
+import { normalizeJsonObject } from "./arabicTextNormalizer";
 
 export interface IStorage {
   getSources(): Promise<Source[]>;
@@ -42,7 +43,9 @@ export class FileStorage implements IStorage {
     for (const suffix of suffixes) {
       try {
         const data = await fs.readFile(path.join(this.dataDir, "laws", `${id}${suffix}.json`), "utf-8");
-        const law = JSON.parse(data);
+        const raw = JSON.parse(data);
+        // Auto-correct OCR/extraction typos in Arabic legal text
+        const { data: law } = normalizeJsonObject(raw);
         // Cache the law (evict oldest if full)
         if (this.lawCache.size >= this.MAX_LAW_CACHE) {
           const firstKey = this.lawCache.keys().next().value;

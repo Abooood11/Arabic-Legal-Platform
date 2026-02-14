@@ -264,4 +264,43 @@ try {
     console.warn("Search analytics setup:", e.message);
 }
 
+// ============================================
+// Article Overrides Table
+// ============================================
+try {
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS article_overrides (
+            law_id TEXT NOT NULL,
+            article_number TEXT NOT NULL,
+            override_text TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_by TEXT NOT NULL,
+            PRIMARY KEY (law_id, article_number)
+        );
+    `);
+    console.log("Article overrides table ready.");
+} catch (e: any) {
+    console.warn("Article overrides table setup:", e.message);
+}
+
+// ============================================
+// Error Reports Table
+// ============================================
+try {
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS error_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            law_id TEXT NOT NULL,
+            article_number INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            resolved_at TEXT
+        );
+    `);
+    console.log("Error reports table ready.");
+} catch (e: any) {
+    console.warn("Error reports table setup:", e.message);
+}
+
 console.log(`Database connected: ${dbPath}`);

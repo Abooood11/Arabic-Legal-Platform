@@ -1,5 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import type { Server } from "http";
+import fs from "fs/promises";
+import path from "path";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { registerAuthRoutes, isAuthenticated, isAdmin, setupAuthSchema } from "./authSystem";
@@ -9,6 +11,7 @@ import { eq, and, desc, sql, like } from "drizzle-orm";
 import { readLatestLegalMonitoringReport, runLegalMonitoringScan } from "./legalMonitoring";
 import { setupAnalyticsSchema, recordAnalyticsEvent } from "./analytics";
 import { buildLegalFtsQuery, buildLiteralFtsQuery } from "./searchUtils";
+import { arabicNormalizerMiddleware } from "./arabicTextNormalizer";
 
 const saudiGazetteCategoryCaseSql = (alias: string) => `
   CASE
@@ -73,6 +76,14 @@ export async function registerRoutes(
   setupAuthSchema();
   setupAnalyticsSchema();
   registerAuthRoutes(app);
+
+  // Arabic text normalizer: auto-corrects OCR/extraction typos in legal text responses
+  // Applied to law, judgment, and gazette endpoints
+  const normalizeArabic = arabicNormalizerMiddleware();
+  app.use("/api/laws", normalizeArabic);
+  app.use("/api/judgments", normalizeArabic);
+  app.use("/api/gazette", normalizeArabic);
+  app.use("/api/search", normalizeArabic);
 
 
   app.post("/api/analytics/track", (req, res) => {
@@ -225,6 +236,105 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ============================================
+  // Extraction Debugging API
+  // ============================================
+  app.get("/api/admin/extraction-debug", isAuthenticated, isAdmin, async (_req: any, res: any) => {
+    try {
+      const lawsDir = path.join(process.cwd(), "client", "public", "data", "laws");
+      const libraryData = await storage.getLibrary();
+
+      // Only check laws referenced in library (not all 3900+ files)
+      const lawIds: string[] = [];
+      for (const item of libraryData) {
+        if (item.laws_included && item.laws_included.length > 0) {
+          lawIds.push(...item.laws_included);
+        } else {
+          lawIds.push(item.id);
+        }
+      }
+      const uniqueIds = [...new Set(lawIds)];
+
+      type Result = {
+        id: string; fileName: string; title: string;
+        totalArticles: number | null; actualArticles: number;
+        hasEmptyArticles: number; hasPreamble: boolean;
+        hasRoyalDecree: boolean; hasCabinetDecision: boolean;
+        missingText: number; duplicateNumbers: number[];
+        issues: string[];
+      };
+
+      const analyzeLaw = async (id: string): Promise<Result> => {
+        const suffixes = ["", "_boe", "_uqn"];
+        for (const suffix of suffixes) {
+          const fileName = `${id}${suffix}.json`;
+          try {
+            const raw = await fs.readFile(path.join(lawsDir, fileName), "utf-8");
+            const law = JSON.parse(raw);
+            const articles = law.articles || [];
+            const libEntry = libraryData.find((l: any) => l.id === id);
+            const issues: string[] = [];
+
+            const missingText = articles.filter((a: any) => !a.text || a.text.trim().length === 0).length;
+            const nums = articles.map((a: any) => a.number);
+            const seen = new Set<number>();
+            const dupes: number[] = [];
+            for (const n of nums) { if (seen.has(n)) dupes.push(n); seen.add(n); }
+
+            if (law.total_articles && law.total_articles !== articles.length)
+              issues.push(`عدد المواد المعلن (${law.total_articles}) لا يطابق الفعلي (${articles.length})`);
+            if (missingText > 0) issues.push(`${missingText} مادة بدون نص`);
+            if (dupes.length > 0) issues.push(`أرقام مواد مكررة: ${dupes.join(", ")}`);
+            if (!law.law_name) issues.push("اسم النظام مفقود");
+            if (articles.length === 0) issues.push("لا توجد مواد");
+
+            return {
+              id, fileName,
+              title: law.law_name || libEntry?.title_ar || "بدون عنوان",
+              totalArticles: law.total_articles || null,
+              actualArticles: articles.length,
+              hasEmptyArticles: missingText,
+              hasPreamble: !!(law.preamble || law.preamble_text),
+              hasRoyalDecree: !!law.royal_decree,
+              hasCabinetDecision: !!(law.cabinet_decision || law.cabinet_decision_text),
+              missingText, duplicateNumbers: dupes, issues,
+            };
+          } catch { continue; }
+        }
+        return {
+          id, fileName: `${id}.json`,
+          title: libraryData.find((l: any) => l.id === id)?.title_ar || "ملف مفقود",
+          totalArticles: null, actualArticles: 0, hasEmptyArticles: 0,
+          hasPreamble: false, hasRoyalDecree: false, hasCabinetDecision: false,
+          missingText: 0, duplicateNumbers: [],
+          issues: ["ملف القانون غير موجود"],
+        };
+      };
+
+      // Process in parallel batches of 20
+      const results: Result[] = [];
+      for (let i = 0; i < uniqueIds.length; i += 20) {
+        const batch = uniqueIds.slice(i, i + 20);
+        const batchResults = await Promise.all(batch.map(analyzeLaw));
+        results.push(...batchResults);
+      }
+
+      const withIssues = results.filter((r) => r.issues.length > 0);
+      res.json({
+        summary: {
+          totalLaws: results.length,
+          healthyLaws: results.length - withIssues.length,
+          lawsWithIssues: withIssues.length,
+          totalIssues: withIssues.reduce((s, r) => s + r.issues.length, 0),
+        },
+        laws: results.sort((a, b) => b.issues.length - a.issues.length),
+      });
+    } catch (err: any) {
+      console.error("[extraction-debug] error:", err);
+      res.status(500).json({ message: err.message || "Extraction debug failed" });
+    }
+  });
+
   app.get(api.sources.list.path, async (req, res) => {
     const sources = await storage.getSources();
     res.set("Cache-Control", "public, max-age=600");
@@ -244,8 +354,9 @@ export async function registerRoutes(
     if (!law) {
       return res.status(404).json({ message: "Law not found" });
     }
-    // Cache individual law for 1 hour in browser
-    res.set("Cache-Control", "public, max-age=3600");
+    // In development, don't cache; in production cache for 1 hour
+    const isDev = (process.env.NODE_ENV || '').trim() === 'development';
+    res.set("Cache-Control", isDev ? "no-cache" : "public, max-age=3600");
     res.json(law);
   });
 

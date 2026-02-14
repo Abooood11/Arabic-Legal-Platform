@@ -1095,8 +1095,10 @@ export default function LawDetail() {
                                 normalizedParas.push({ marker: compoundMatch[2] + ' :', text: t.slice(compoundMatch[0].length).trim(), dataLevel: correctedLevel + 1 });
                                 continue;
                               }
-                              // Simple numeric: "4 الوسائط :" → marker "4-" with text
-                              const numMatch = t.match(/^(\d{1,2}|[٠-٩]{1,2})\s*[-–\s]\s*([\u0600-\u06FF])/);
+                              // Simple numeric: "4- الوسائط" or "4 – النص" → marker "4-" with text
+                              // IMPORTANT: Require explicit dash/dot separator (not just space)
+                              // to avoid matching monetary amounts like "50 في الدعاوى"
+                              const numMatch = t.match(/^(\d{1,2}|[٠-٩]{1,2})\s*[-–.]\s*([\u0600-\u06FF])/);
                               if (numMatch) {
                                 m = numMatch[1] + '-';
                                 t = t.slice(t.indexOf(numMatch[2])).trim();
