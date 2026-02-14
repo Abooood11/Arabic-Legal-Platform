@@ -16,6 +16,16 @@ interface ErrorReport {
   resolvedAt: string | null;
 }
 
+interface LegalMonitoringSummary {
+  generated_at: string;
+  counts: {
+    total: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+}
+
 function toHindiNumerals(num: number | string): string {
   const hindiDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
   return num.toString().replace(/[0-9]/g, (d) => hindiDigits[parseInt(d)]);
@@ -38,6 +48,42 @@ export default function ErrorReports() {
 
   const { data, isLoading } = useQuery<{ reports: ErrorReport[] }>({
     queryKey: ["/api/error-reports"],
+  });
+
+  const {
+    data: legalMonitoringData,
+    isLoading: isLegalReportLoading,
+  } = useQuery<{ report: LegalMonitoringSummary }>({
+    queryKey: ["/api/legal-monitoring/report"],
+    retry: false,
+  });
+
+  const runLegalMonitoringMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/legal-monitoring/run", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to run legal monitoring");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/legal-monitoring/report"] });
+      toast({
+        title: "تم تشغيل الرصد",
+        description: "تم إنشاء تقرير الرصد القانوني/النظامي بنجاح.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "تعذر التشغيل",
+        description: "حدث خطأ أثناء تشغيل الرصد. حاول مرة أخرى.",
+        variant: "destructive",
+      });
+    },
   });
 
   const resolveMutation = useMutation({
@@ -92,6 +138,35 @@ export default function ErrorReports() {
           <Button variant="outline" size="sm">العودة للنظام</Button>
         </Link>
       </div>
+
+      <Card className="mb-6 border-primary/30">
+        <CardHeader>
+          <CardTitle className="text-lg">الرصد القانوني والنظامي المستمر</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLegalReportLoading ? (
+            <p className="text-sm text-slate-500">جاري تحميل تقرير الرصد...</p>
+          ) : legalMonitoringData?.report ? (
+            <div className="text-sm text-slate-700 space-y-1">
+              <p>آخر تشغيل: {formatDate(legalMonitoringData.report.generated_at)}</p>
+              <p>
+                النتائج: إجمالي {toHindiNumerals(legalMonitoringData.report.counts.total)} — عالي {toHindiNumerals(legalMonitoringData.report.counts.high)}،
+                متوسط {toHindiNumerals(legalMonitoringData.report.counts.medium)}، منخفض {toHindiNumerals(legalMonitoringData.report.counts.low)}.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">لا يوجد تقرير رصد بعد. يمكنك تشغيله الآن.</p>
+          )}
+
+          <Button
+            onClick={() => runLegalMonitoringMutation.mutate()}
+            disabled={runLegalMonitoringMutation.isPending}
+            data-testid="button-run-legal-monitoring"
+          >
+            {runLegalMonitoringMutation.isPending ? "جاري تشغيل الرصد..." : "تشغيل الرصد الآن"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {reports.length === 0 ? (
         <Card>
