@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
+import { fixArabicDate } from "@/lib/judgment-parser";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     Sheet,
@@ -497,7 +498,7 @@ export default function Judgments() {
                                                 {item.judgmentDate && (
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
-                                                        {item.judgmentDate}
+                                                        {fixArabicDate(item.judgmentDate)}
                                                     </span>
                                                 )}
                                             </div>

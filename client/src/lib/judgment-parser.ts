@@ -5,6 +5,104 @@
  * Supports both Saudi MOJ and Egyptian court judgments.
  */
 
+/**
+ * Fix Arabic date display issues:
+ * 1. Fix OCR ه→5/٥ confusion in Hijri dates (both Arabic-Indic and Western digits)
+ * 2. Replace / with - for Arabic-Indic digits to prevent BiDi reversal in RTL
+ * 3. Fix OCR هو→هـ (Hijri suffix)
+ */
+export function fixArabicDate(text: string): string {
+    return text
+        // Fix OCR ه→٥ in Hijri dates with Arabic-Indic digits
+        .replace(/ه\/ه(\/[١][٣٤][٠-٩]{2})/g, '٥/٥$1')             // ه/ه/1Yxx (both are ه)
+        .replace(/ه(\/[٠-٩]{1,2}\/[١][٣٤][٠-٩]{2})/g, '٥$1')
+        .replace(/([٠-٩]{1,2}\/)ه(\/[١][٣٤][٠-٩]{2})/g, '$1٥$2')
+        .replace(/([١][٣٤][٠-٩]{2}\/[٠-٩]{1,2}\/)ه(?=[^٠-٩\d]|$)/g, '$1٥')
+        .replace(/([١][٣٤][٠-٩]{2}\/)ه(\/[٠-٩]{1,2})/g, '$1٥$2')
+        // Fix OCR ه→5 in Hijri dates with Western digits (e.g. ه/8/1440 → 5/8/1440)
+        .replace(/ه\/ه(\/1[34]\d{2})/g, '5/5$1')              // ه/ه/1Yxx (both are ه)
+        .replace(/ه(\/\d{1,2}\/1[34]\d{2})/g, '5$1')
+        .replace(/(\d{1,2}\/)ه(\/1[34]\d{2})/g, '$15$2')
+        .replace(/(1[34]\d{2}\/\d{1,2}\/)ه(?=[^\d٠-٩]|$)/g, '$15')
+        .replace(/(1[34]\d{2}\/)ه(\/\d{1,2})/g, '$15$2')
+        // Fix / → - for Arabic-Indic digits (prevents BiDi visual reversal)
+        .replace(/([٠-٩]{1,4})\/([٠-٩]{1,2})\/([٠-٩]{1,4})/g, '$1-$2-$3')
+        // Fix OCR هو → هـ after dates
+        .replace(/([\d٠-٩]+[\/\-.][\d٠-٩]+[\/\-.][\d٠-٩]+)\s*هو(?=[^٠-٩\w]|$)/g, '$1هـ');
+}
+
+/**
+ * Whitelist of standalone short lines that ARE valid judgment content.
+ * Everything else that's a standalone short line between blank lines = PDF book artifact.
+ *
+ * PDF book structure: each page has headers (court name, category, الموضوعات, الملخص, etc.)
+ * that OCR reads as text and inserts between paragraphs. These appear as short standalone
+ * lines surrounded by blank lines. OCR also corrupts these into random words (e.g. الأنتيك,
+ * مجمع علم الكلام, الموصوفات, etc.) making word-matching impossible.
+ *
+ * Root solution: structural detection — any short standalone line that's NOT on the whitelist
+ * is a PDF artifact and gets removed.
+ */
+const VALID_STANDALONE_RE = /^(?:الوقائع|الأسباب|\( الأسباب \)|\(الأسباب\)|المنطوق|خاتمة|بسم الله الرحمن الرحيم|الحمد لله|وصلى الله|والله الموفق|وبالله التوفيق|الموفق|لذلك حكم|فلهذه الأسباب|حكمت ال|قررت ال|قضاء[،.]|بالأسباب|لما هو م|هو موضح|مبين بالأسباب|موضح بالأسباب|ورفض ما عدا|وصحبه أجمعين|هيئة الت|أدلة الاتهام)/;
+
+/** Pattern to detect الأسباب section content (starts reasoning section) */
+const ASBAB_CONTENT_START_RE = /^(?:لما كان|من حيث|وحيث إن|ولما كان|وبعد الاطلاع)/;
+
+/** Pattern to detect الوقائع section content (starts facts section) */
+const WAQAEI_CONTENT_START_RE = /^(?:تتلخص|تخلص|تتحصل|حيث إن الوقائع|تتمثل وقائع|وقائع ال)/;
+
+/**
+ * Strip PDF book structural artifacts from BOG judgment text.
+ * Removes standalone short lines (surrounded by blank lines) that are NOT
+ * valid judgment content — these are page headers, category labels, footers,
+ * and their OCR-corrupted variants that leaked into the text.
+ *
+ * Special handling: if an artifact line appears right before الأسباب content
+ * (لما كان, وحيث إن, etc.), it's a corrupted الأسباب header → replace with الأسباب.
+ */
+export function stripPdfBookArtifacts(text: string): string {
+    const lines = text.split('\n');
+    const result: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        const t = lines[i].trim();
+        const prev = i > 0 ? lines[i - 1].trim() : '';
+        const next = i < lines.length - 1 ? lines[i + 1].trim() : '';
+
+        // Only consider non-empty short lines surrounded by blank/empty lines
+        if (t.length >= 2 && t.length < 60 && prev === '' && next === '') {
+            // Strip markdown formatting for matching
+            const clean = t.replace(/^#{1,3}\s*/, '').replace(/\*\*/g, '').trim();
+            // Keep if it matches a valid judgment content pattern
+            if (VALID_STANDALONE_RE.test(clean)) {
+                result.push(lines[i]);
+            } else {
+                // Check: is this a corrupted الأسباب header?
+                // Look ahead for الأسباب content start (لما كان, وحيث إن, etc.)
+                let nextContent = '';
+                for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                    if (lines[j].trim().length > 10) {
+                        nextContent = lines[j].trim();
+                        break;
+                    }
+                }
+                if (ASBAB_CONTENT_START_RE.test(nextContent)) {
+                    // Replace corrupted header with correct الأسباب
+                    result.push('الأسباب');
+                } else if (WAQAEI_CONTENT_START_RE.test(nextContent)) {
+                    // Replace corrupted header with correct الوقائع
+                    result.push('الوقائع');
+                } else {
+                    // Remove this artifact line (replace with empty)
+                    result.push('');
+                }
+            }
+        } else {
+            result.push(lines[i]);
+        }
+    }
+    return result.join('\n');
+}
+
 export interface JudgmentSection {
     id: string;
     title: string;
@@ -349,6 +447,196 @@ export interface JudgeInfo {
  * Saudi judgments end with: عضو [name] عضو [name] رئيس الدائرة [name]
  * Returns null if no judges detected or if source is not Saudi.
  */
+/**
+ * BOG judgment metadata extracted from the preamble (before الوقائع).
+ * Covers both ديوان المظالم and المحكمة الإدارية العليا formats.
+ */
+export interface BogMetadata {
+    /** Case reference lines (رقم القضية، رقم الحكم، رقم الاعتراض، تاريخ الجلسة) */
+    caseInfo: { label: string; value: string }[];
+    /** Legal principles (المبادئ المستخلصة / الموضوعات) */
+    principles: string[];
+    /** Legal references (مستند الحكم / مستند المحاكم) */
+    legalBasis: string[];
+    /** The cleaned judgment body text starting from الوقائع */
+    bodyText: string;
+    /** Collection name parsed from case_id (e.g. مجموعة أحكام المحكمة الإدارية العليا ١٤٤٣هـ - المجلد الثاني) */
+    collectionName?: string;
+}
+
+// OCR correction map for display
+const OCR_DISPLAY_FIXES: [RegExp, string][] = [
+    [/المبدادي المستخلصة/g, "المبادئ المستخلصة"],
+    [/المبادي المستخلصة/g, "المبادئ المستخلصة"],
+    [/المبادىء المستخلصة/g, "المبادئ المستخلصة"],
+    [/الموصوفات/g, "الموضوعات"],
+    [/الموصوعات/g, "الموضوعات"],
+    [/المووضعت/g, "الموضوعات"],
+    [/الموضعت/g, "الموضوعات"],
+    [/مستئند المحاكم/g, "مستند الحكم"],
+    [/مستئند الحكم/g, "مستند الحكم"],
+    [/مستند المحاكم/g, "مستند الحكم"],
+    [/مسنتد الحكم/g, "مستند الحكم"],
+    [/www\.\w+\.com/g, ""],
+    [/0AE/g, ""],
+];
+
+function fixOcrDisplay(text: string): string {
+    let result = text;
+    for (const [pattern, replacement] of OCR_DISPLAY_FIXES) {
+        result = result.replace(pattern, replacement);
+    }
+    return result;
+}
+
+/**
+ * Parse BOG case_id to extract collection name.
+ * Format: BOG-supreme-1443-V2-4835-M127/1439 or BOG-1442-V1-937/1441
+ */
+function parseBogCollectionName(caseId?: string, courtBody?: string): string | undefined {
+    if (!caseId || !caseId.startsWith('BOG-')) return undefined;
+
+    const VOLUME_AR: Record<string, string> = {
+        '1': 'الأول', '2': 'الثاني', '3': 'الثالث', '4': 'الرابع',
+        '5': 'الخامس', '6': 'السادس', '7': 'السابع', '8': 'الثامن',
+        '9': 'التاسع', '10': 'العاشر',
+    };
+
+    // BOG-supreme-1443-V2-... or BOG-1442-V1-...
+    const supremeMatch = caseId.match(/^BOG-supreme-(\d{4})-V(\d+)/);
+    const normalMatch = caseId.match(/^BOG-(\d{4})-V(\d+)/);
+
+    if (supremeMatch) {
+        const year = supremeMatch[1];
+        const vol = supremeMatch[2];
+        const volName = VOLUME_AR[vol] || vol;
+        return `مجموعة أحكام المحكمة الإدارية العليا ${year}هـ - المجلد ${volName}`;
+    }
+    if (normalMatch) {
+        const year = normalMatch[1];
+        const vol = normalMatch[2];
+        const volName = VOLUME_AR[vol] || vol;
+        const court = courtBody || 'ديوان المظالم';
+        return `مجموعة أحكام ${court} ${year}هـ - المجلد ${volName}`;
+    }
+    return undefined;
+}
+
+/**
+ * Parse BOG judgment text to extract structured metadata from the preamble.
+ * Returns null for non-BOG judgments.
+ */
+export function parseBogMetadata(text: string, source?: string, caseId?: string, courtBody?: string): BogMetadata | null {
+    if (!text || (source !== "bog_judicial")) return null;
+
+    // Find where الوقائع section starts (the actual judgment body)
+    const waqaeiPatterns = [
+        /^#{0,3}\s*الوقائع\s*$/m,
+        /^الوقائع\s*$/m,
+        /\nالوقائع\n/,
+        /\nالوقائع\s*$/m,
+    ];
+
+    let bodyStart = -1;
+    for (const pat of waqaeiPatterns) {
+        const m = text.match(pat);
+        if (m && m.index !== undefined) {
+            bodyStart = m.index;
+            break;
+        }
+    }
+
+    // If no الوقائع found, try الأسباب as fallback
+    if (bodyStart < 0) {
+        const asbabMatch = text.match(/^#{0,3}\s*الأسباب\s*$/m);
+        if (asbabMatch && asbabMatch.index !== undefined) {
+            bodyStart = asbabMatch.index;
+        }
+    }
+
+    // If still no section found, no metadata to extract
+    if (bodyStart < 100) return null;
+
+    const preamble = fixOcrDisplay(text.substring(0, bodyStart));
+    const bodyText = text.substring(bodyStart);
+
+    // 1. Extract case info lines (first lines before # header)
+    const caseInfo: { label: string; value: string }[] = [];
+    const preambleLines = preamble.split('\n');
+
+    for (const line of preambleLines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) break;
+
+        // Parse "label value" patterns
+        const casePatterns = [
+            { re: /^رقم الحكم في المجموعة\s+(.+)/, label: "رقم الحكم في المجموعة" },
+            { re: /^رقم القضية في المحكمة الإدارية\s+(.+)/, label: "رقم القضية في المحكمة الإدارية" },
+            { re: /^رقم القضية في محكمة الاستئناف الإدارية\s+(.+)/, label: "رقم القضية في محكمة الاستئناف" },
+            { re: /^رقم الاستئناف\s+(.+)/, label: "رقم الاستئناف" },
+            { re: /^رقم الاعتراض\s+(.+)/, label: "رقم الاعتراض" },
+            { re: /^تاريخ الجلسة\s+(.+)/, label: "تاريخ الجلسة" },
+            { re: /^رقم القضية:?\s+(.+)/, label: "رقم القضية" },
+            { re: /^رقم الحكم الابتدائي:?\s+(.+)/, label: "رقم الحكم الابتدائي" },
+            { re: /^القضية رقم:?\s+(.+)/, label: "رقم القضية" },
+            { re: /^الحكم الابتدائي رقم:?\s+(.+)/, label: "الحكم الابتدائي" },
+        ];
+
+        for (const { re, label } of casePatterns) {
+            const m = trimmed.match(re);
+            if (m) {
+                caseInfo.push({ label, value: m[1].trim() });
+                break;
+            }
+        }
+    }
+
+    // 2. Extract principles (المبادئ المستخلصة / الموضوعات)
+    const principles: string[] = [];
+    const principlesHeaderRe = /(?:المبادئ المستخلصة|الموضوعات)\s*\n([\s\S]*?)(?=\n(?:#|مستند|الوقائع|الأسباب|$))/i;
+    const principlesMatch = preamble.match(principlesHeaderRe);
+    if (principlesMatch) {
+        const principlesBlock = principlesMatch[1].trim();
+        // Split by letter prefix (أ. ب. ج.) or numbered items
+        const items = principlesBlock.split(/\n(?=[أ-ي][.\-]\s|[١٢٣٤٥٦٧٨٩0-9]+[.\-]\s)/);
+        for (const item of items) {
+            const cleaned = item.trim().replace(/^[أ-ي][.\-]\s*/, '').trim();
+            if (cleaned.length > 10) {
+                principles.push(cleaned);
+            }
+        }
+        // If no split worked, try the whole block as one principle
+        if (principles.length === 0 && principlesBlock.length > 10) {
+            // Try splitting by ## headers
+            const subItems = principlesBlock.split(/\n##\s*/);
+            for (const item of subItems) {
+                const cleaned = item.trim();
+                if (cleaned.length > 10) {
+                    principles.push(cleaned);
+                }
+            }
+        }
+    }
+
+    // 3. Extract legal basis (مستند الحكم)
+    const legalBasis: string[] = [];
+    const basisHeaderRe = /مستند الحكم\s*\n([\s\S]*?)(?=\n(?:#|الوقائع|الأسباب|$))/i;
+    const basisMatch = preamble.match(basisHeaderRe);
+    if (basisMatch) {
+        const basisBlock = basisMatch[1].trim();
+        const items = basisBlock.split(/\n(?=[-–•]\s|المادة)/);
+        for (const item of items) {
+            const cleaned = item.trim().replace(/^[-–•]\s*/, '').trim();
+            if (cleaned.length > 5) {
+                legalBasis.push(cleaned);
+            }
+        }
+    }
+
+    const collectionName = parseBogCollectionName(caseId, courtBody);
+    return { caseInfo, principles, legalBasis, bodyText, collectionName };
+}
+
 export function extractJudges(text: string, source?: string): JudgeInfo[] | null {
     if (!text || source !== "sa_judicial") return null;
 

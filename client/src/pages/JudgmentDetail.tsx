@@ -34,8 +34,12 @@ import {
     formatJudgmentText,
     findHighlightableTokens,
     extractJudges,
+    parseBogMetadata,
+    fixArabicDate,
+    stripPdfBookArtifacts,
     type HighlightedToken,
     type JudgeInfo,
+    type BogMetadata,
 } from "@/lib/judgment-parser";
 
 interface Judgment {
@@ -65,24 +69,34 @@ const TOKEN_STYLES: Record<string, string> = {
  *   Format B (~13K): (الوقائع) → (الأسباب) → (منطوق الحكم)
  * We match both. Order matters: first match per label wins.
  */
-const SECTION_DIVIDERS: { patterns: RegExp[]; label: string; color: string; bg: string; border: string }[] = [
+const SECTION_DIVIDERS: { patterns: RegExp[]; label: string; color: string; bg: string; border: string; keepMatchInText?: boolean }[] = [
     {
-        // Format B: (الوقائع)  |  Format A: الوقائع:
-        patterns: [/\(الوقائع\)/, /الوقائع\s*:/],
+        // Format B: (الوقائع)  |  Format A: الوقائع:  |  BOG: standalone الوقائع
+        patterns: [/\(الوقائع\)/, /الوقائع\s*:/, /^\s*الوقائع\s*$/m],
         label: "الوقائع",
         color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200",
     },
     {
-        // Format B: (الأسباب)  |  Format A: الأسباب:  |  Standalone: الأسباب لما كانت
-        patterns: [/\(الأسباب\)/, /الأسباب\s*:/, /الأسباب\s+(?=لما كان)/],
+        // Format B: (الأسباب)  |  Format A: الأسباب:  |  BOG: standalone الأسباب (after ### stripped)
+        patterns: [/\(الأسباب\)/, /الأسباب\s*:/, /^\s*الأسباب\s*$/m, /الأسباب\s+(?=لما كان)/],
         label: "الأسباب",
         color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-200",
     },
     {
-        // Format B: (منطوق الحكم)  |  Format A: نص الحكم:  |  Standalone: الحكم حكمت
-        patterns: [/\(منطوق الحكم\)/, /نص الحكم\s*:/, /الحكم\s+(?=حكمت الدائرة)/],
+        // Format B: (منطوق الحكم)  |  Format A: نص الحكم:  |  BOG: لذلك حكمت | فلهذه الأسباب حكمت
+        // keepMatchInText: the matched phrase (لذلك حكمت) stays in the text after the divider
+        patterns: [/\(منطوق الحكم\)/, /نص الحكم\s*:/, /(?:لذلك|فلهذه الأسباب)\s+حكمت/],
         label: "منطوق الحكم",
         color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200",
+        keepMatchInText: true,
+    },
+    {
+        // BOG appeal/review ruling: "حكمت المحكمة بتأييد..." or "حكمت الهيئة بتأييد..."
+        // Appears after the خاتمة as the appellate court's final ruling
+        patterns: [/حكمت (?:المحكمة|الهيئة|الدائرة) بتأييد/],
+        label: "حكم الاستئناف",
+        color: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-200",
+        keepMatchInText: true,
     },
 ];
 
@@ -94,7 +108,9 @@ function findDividerMatch(text: string, div: typeof SECTION_DIVIDERS[0]): { inde
     let best: { index: number; length: number } | null = null;
     for (const pat of div.patterns) {
         // Use global regex to find all occurrences, pick the valid one
-        const regex = new RegExp(pat.source, 'g');
+        // Preserve original flags (especially 'm' for multiline) and add 'g'
+        const flags = pat.flags.includes('g') ? pat.flags : pat.flags + 'g';
+        const regex = new RegExp(pat.source, flags);
         let m;
         while ((m = regex.exec(text)) !== null) {
             // Skip false positives: "فلهذه الأسباب:" is NOT a section header
@@ -182,14 +198,72 @@ function HighlightedChunk({ text, tokens, searchTerm }: { text: string; tokens: 
  */
 function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: string }) {
     const segments = useMemo(() => {
+        // Pre-clean: strip markdown headers, OCR artifacts, and reflow OCR line breaks
+        let cleanText = text
+            .replace(/^#{1,3}\s*/gm, '')       // remove markdown # ## ###
+            .replace(/^\*{2,3}(.+?)\*{2,3}/gm, '$1')  // strip bold/italic markdown **text** → text
+            .replace(/^\s*0[A-F][A-F0-9]\s*$/gm, '')  // OCR hex artifacts (0AE, 0AA, etc.) on own line
+            .replace(/0[A-F][A-F0-9]/g, '')    // remaining inline hex artifacts
+            .replace(/www\.\w+\.com/g, '')      // stray URLs
+            .replace(/^-{3,}$/gm, '')           // horizontal rules (---)
+            .replace(/\n{3,}/g, '\n\n');        // collapse 3+ blank lines
+
+        // Fix date display issues (ه→٥ OCR, / → - BiDi, هو→هـ OCR)
+        cleanText = fixArabicDate(cleanText);
+
+        // Remove PDF book structural artifacts (page headers, footers, category labels).
+        // Root solution: any short standalone line between blank lines that's NOT
+        // valid judgment content (section headers, rulings, closings) = artifact.
+        // This catches all OCR corruptions (الأنتيك, الموصوفات, مجمع علم الكلام, etc.)
+        // without needing to enumerate each specific corrupted word.
+        cleanText = stripPdfBookArtifacts(cleanText);
+
+        // Remove leaked next-judgment content.
+        // Detect: after appeal confirmation, if a judgment metadata block appears
+        // (2+ consecutive "رقم ال..." lines = new judgment headers), truncate from there.
+        // This catches all cases regardless of OCR corruption of بسم الله.
+        cleanText = cleanText.replace(
+            /(حكمت (?:المحكمة|الهيئة) بتأييد الحكم فيما انتهى إليه من قضاء[.،]?)[\s\S]*?((?:^|\n)رقم ال\S+\s+.+\n\s*رقم ال\S+\s+[\s\S]*)$/,
+            '$1'
+        );
+
+        // Mark standalone section headers with sentinel tokens before reflow.
+        // Use \n\n around sentinels to guarantee they become their own paragraph
+        // after split(/\n\n+/), since the raw OCR text often uses single \n.
+        cleanText = cleanText
+            .replace(/^\s*الوقائع\s*$/gm, '\n\n\x01SEC\x01\n\n')
+            .replace(/^\s*الأسباب\s*$/gm, '\n\n\x02SEC\x02\n\n');
+
+        // Reflow: OCR produces hard line breaks at PDF page width boundaries.
+        // Split on paragraph breaks (\n\n), join single \n within each paragraph.
+        // Then collapse mid-sentence \n\n (no terminal punctuation before break).
+        const sectionKeywords = /^(?:لذلك|فلهذه|ومن حيث|وحيث|ولما كان|\x01|\x02)/;
+        cleanText = cleanText.split(/\n\n+/).map(para => {
+            const t = para.trim();
+            if (!t || t === '\x01SEC\x01' || t === '\x02SEC\x02') return t;
+            return t.replace(/\n/g, ' ');
+        }).filter(p => p !== '').reduce((acc, para) => {
+            if (!acc) return para;
+            // Always keep section markers separate
+            if (para === '\x01SEC\x01' || para === '\x02SEC\x02') return acc + '\n\n' + para;
+            if (acc.endsWith('\x01SEC\x01') || acc.endsWith('\x02SEC\x02')) return acc + '\n\n' + para;
+            // Check if previous paragraph ends with punctuation
+            const endsWithPunct = /[.،؛:\u06D4]$/.test(acc.trim());
+            const startsWithKeyword = sectionKeywords.test(para.trim());
+            if (endsWithPunct || startsWithKeyword) return acc + '\n\n' + para;
+            return acc + ' ' + para; // join mid-sentence break
+        }, '');
+
+        // Restore section headers
+        cleanText = cleanText
+            .replace(/\x01SEC\x01/g, 'الوقائع')
+            .replace(/\x02SEC\x02/g, 'الأسباب');
+
         // Find section header positions using multi-pattern matching
         const headers: { index: number; length: number; config: typeof SECTION_DIVIDERS[0] }[] = [];
         for (const div of SECTION_DIVIDERS) {
-            const match = findDividerMatch(text, div);
+            const match = findDividerMatch(cleanText, div);
             if (match) {
-                // Avoid false positives: for colon-based patterns (الحكم:),
-                // skip matches that are part of phrases like "فلهذه الأسباب:"
-                // by ensuring they appear after a reasonable position
                 headers.push({ index: match.index, length: match.length, config: div });
             }
         }
@@ -198,7 +272,7 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
 
         if (headers.length === 0) {
             // No headers found - return entire text as one segment
-            return [{ type: "text" as const, content: text, config: null as typeof SECTION_DIVIDERS[0] | null }];
+            return [{ type: "text" as const, content: cleanText, config: null as typeof SECTION_DIVIDERS[0] | null }];
         }
 
         const result: { type: "text" | "divider"; content: string; config: typeof SECTION_DIVIDERS[0] | null }[] = [];
@@ -207,19 +281,20 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
         for (const h of headers) {
             // Text before this header
             if (h.index > cursor) {
-                const before = text.substring(cursor, h.index).trim();
+                const before = cleanText.substring(cursor, h.index).trim();
                 if (before) {
                     result.push({ type: "text", content: before, config: null });
                 }
             }
             // The divider itself
-            result.push({ type: "divider", content: text.substring(h.index, h.index + h.length), config: h.config });
-            cursor = h.index + h.length;
+            result.push({ type: "divider", content: cleanText.substring(h.index, h.index + h.length), config: h.config });
+            // If keepMatchInText, don't skip matched text (e.g. "لذلك حكمت" stays in body)
+            cursor = h.config.keepMatchInText ? h.index : h.index + h.length;
         }
 
         // Text after last header
-        if (cursor < text.length) {
-            const after = text.substring(cursor).trim();
+        if (cursor < cleanText.length) {
+            const after = cleanText.substring(cursor).trim();
             if (after) {
                 result.push({ type: "text", content: after, config: null });
             }
@@ -247,8 +322,14 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
                 // Text segment - format into paragraphs
                 const formatted = formatJudgmentText(seg.content);
                 const tokens = findHighlightableTokens(formatted);
+
+                // Detect closing (خاتمة) phrases - center them
+                const isClosing = /^والله (?:الموفق|أعلم|ولي التوفيق)/.test(seg.content.trim())
+                    || /^وصلى الله/.test(seg.content.trim())
+                    || /^حرر(?:ت)? (?:هذا|هذه|في)/.test(seg.content.trim());
+
                 return (
-                    <div key={i} className="judgment-text">
+                    <div key={i} className={`judgment-text leading-[2] whitespace-pre-line ${isClosing ? 'text-center text-muted-foreground mt-8' : 'text-justify'}`} dir="rtl">
                         <HighlightedChunk
                             text={formatted}
                             tokens={tokens}
@@ -257,6 +338,77 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
                     </div>
                 );
             })}
+        </div>
+    );
+}
+
+/**
+ * Renders structured BOG metadata: case info, principles, legal basis.
+ */
+function BogMetadataPanel({ meta }: { meta: BogMetadata }) {
+    return (
+        <div className="space-y-4 mb-5">
+            {/* Collection Name */}
+            {meta.collectionName && (
+                <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 flex items-center gap-2 text-sm text-slate-600">
+                    <BookOpen className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="font-medium">{meta.collectionName}</span>
+                </div>
+            )}
+
+            {/* Case Reference Info */}
+            {meta.caseInfo.length > 0 && (
+                <div className="rounded-2xl bg-background border shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-3 text-sm font-bold text-slate-600">
+                        <Landmark className="h-4 w-4" />
+                        <span>بيانات القضية</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {meta.caseInfo.map((info, i) => (
+                            <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100">
+                                <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5">{info.label}:</span>
+                                <span className="text-sm font-medium text-slate-800">{fixArabicDate(info.value)}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Legal Principles */}
+            {meta.principles.length > 0 && (
+                <div className="rounded-2xl bg-background border shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-3 text-sm font-bold text-emerald-700">
+                        <Scale className="h-4 w-4" />
+                        <span>المبادئ المستخلصة</span>
+                    </div>
+                    <div className="space-y-2">
+                        {meta.principles.map((principle, i) => (
+                            <div key={i} className="flex gap-3 px-4 py-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
+                                <span className="text-emerald-600 font-bold text-sm mt-0.5 shrink-0">{'أبجدهوزحطيكلمنسعفصقرشتثخذضظغ'[i] || String(i + 1)}.</span>
+                                <span className="text-sm leading-relaxed text-slate-700">{principle}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Legal Basis */}
+            {meta.legalBasis.length > 0 && (
+                <div className="rounded-2xl bg-background border shadow-sm p-5">
+                    <div className="flex items-center gap-2 mb-3 text-sm font-bold text-blue-700">
+                        <BookOpen className="h-4 w-4" />
+                        <span>مستند الحكم</span>
+                    </div>
+                    <ul className="space-y-1.5">
+                        {meta.legalBasis.map((basis, i) => (
+                            <li key={i} className="flex gap-2 text-sm text-slate-700 leading-relaxed">
+                                <span className="text-blue-400 mt-1 shrink-0">•</span>
+                                <span>{basis}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </div>
     );
 }
@@ -346,6 +498,11 @@ export default function JudgmentDetail() {
         return extractJudges(judgment.text, judgment.source);
     }, [judgment?.text, judgment?.source]);
 
+    const bogMeta = useMemo(() => {
+        if (!judgment?.text) return null;
+        return parseBogMetadata(judgment.text, judgment.source, judgment.caseId, judgment.courtBody);
+    }, [judgment?.text, judgment?.source, judgment?.caseId, judgment?.courtBody]);
+
     if (isLoading) {
         return (
             <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -382,7 +539,7 @@ export default function JudgmentDetail() {
         chips.push({ icon: Hash, label: isEgyptian ? "رقم الطعن" : "رقم الحكم", value: judgment.judgmentNumber });
     }
     if (judgment.judgmentDate) {
-        chips.push({ icon: Calendar, label: isEgyptian ? "تاريخ الجلسة" : "تاريخ الحكم", value: judgment.judgmentDate });
+        chips.push({ icon: Calendar, label: isEgyptian ? "تاريخ الجلسة" : "تاريخ الحكم", value: fixArabicDate(judgment.judgmentDate) });
     }
 
     return (
@@ -481,10 +638,15 @@ export default function JudgmentDetail() {
                     </div>
                 </div>
 
+                {/* BOG Metadata Panel */}
+                {bogMeta && (bogMeta.caseInfo.length > 0 || bogMeta.principles.length > 0 || bogMeta.legalBasis.length > 0) && (
+                    <BogMetadataPanel meta={bogMeta} />
+                )}
+
                 {/* Judgment Text */}
                 <div className="rounded-2xl bg-background border shadow-sm p-6 sm:p-8">
                     <JudgmentTextBody
-                        text={judgment.text}
+                        text={bogMeta?.bodyText || judgment.text}
                         searchTerm={searchTerm}
                     />
                 </div>
