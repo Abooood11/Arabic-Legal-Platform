@@ -35,7 +35,7 @@ export function Footer() {
   };
 
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/auth";
   };
 
   return (
@@ -110,7 +110,7 @@ export function Footer() {
                 data-testid="button-secret-login"
               >
                 <LogIn className="w-4 h-4" />
-                تسجيل الدخول عبر Replit
+                تسجيل الدخول إلى لوحة الإدارة
               </Button>
             </div>
           </DialogContent>

@@ -1,14 +1,16 @@
 import { Link, useLocation } from "wouter";
-import { Scale, Menu, BookOpen, Info, LogOut, User, FileText, Newspaper, Search } from "lucide-react";
+import { Scale, Menu, BookOpen, Info, LogOut, User, FileText, Newspaper, Search, LayoutDashboard } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useAdmin } from "@/hooks/use-admin";
 
 export function Navbar() {
   const [location, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const { user, isAuthenticated, logout, isLoading } = useAuth();
+  const { isAdmin } = useAdmin();
 
   // Global Ctrl+K shortcut to open search page
   useEffect(() => {
@@ -46,6 +48,12 @@ export function Navbar() {
 
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-6">
+          {isAdmin && (
+            <Link href="/admin" className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${location.startsWith("/admin") ? "text-primary" : "text-muted-foreground"}`}>
+              <LayoutDashboard className="w-4 h-4" />
+              لوحة المسؤول
+            </Link>
+          )}
           {links.map((link) => (
             <Link
               key={link.href}
@@ -100,6 +108,12 @@ export function Navbar() {
                 </Link>
               </div>
               <nav className="flex flex-col gap-2">
+                {isAdmin && (
+                  <Link href="/admin" onClick={() => setIsOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.startsWith("/admin") ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}>
+                    <LayoutDashboard className="w-5 h-5" />
+                    لوحة المسؤول
+                  </Link>
+                )}
                 {links.map((link) => (
                   <Link
                     key={link.href}

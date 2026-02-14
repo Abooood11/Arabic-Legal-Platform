@@ -2,39 +2,171 @@ import type { Express, RequestHandler } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-// import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-
-// Mock auth functions
-const setupAuth = async (app: any) => { };
-const registerAuthRoutes = (app: any) => { };
-const isAuthenticated: RequestHandler = (req, res, next) => {
-  // Mock a user for protected routes
-  (req as any).user = { claims: { sub: "dev_admin" } };
-  next();
-};
+import { registerAuthRoutes, isAuthenticated, isAdmin, setupAuthSchema } from "./authSystem";
 import { db, sqlite } from "./db";
 import { articleOverrides, errorReports, judgments, gazetteIndex } from "@shared/schema";
 import { eq, and, desc, sql, like } from "drizzle-orm";
 import { readLatestLegalMonitoringReport, runLegalMonitoringScan } from "./legalMonitoring";
-const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
-
-const isAdmin: RequestHandler = async (req, res, next) => {
-  // Bypass admin check
-  next();
-};
+import { setupAnalyticsSchema, recordAnalyticsEvent } from "./analytics";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
 
-  // await setupAuth(app);
-  // registerAuthRoutes(app);
+  setupAuthSchema();
+  setupAnalyticsSchema();
+  registerAuthRoutes(app);
 
-  app.get("/api/auth/admin-status", isAuthenticated, (req: any, res) => {
-    const userId = req.user?.claims?.sub;
-    const isAdminUser = ADMIN_USER_IDS.includes(userId);
-    res.json({ isAdmin: isAdminUser });
+
+  app.post("/api/analytics/track", (req, res) => {
+    try {
+      recordAnalyticsEvent(req, req.body);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Analytics track error:", error);
+      res.status(500).json({ message: "Failed to track analytics" });
+    }
+  });
+
+
+  app.get("/api/admin/dashboard", isAuthenticated, isAdmin, async (req, res) => {
+    const tableExists = (name: string) => {
+      const row = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) as any;
+      return !!row;
+    };
+
+    let pendingErrorReports = 0;
+    try {
+      pendingErrorReports = tableExists("error_reports")
+        ? Number((sqlite.prepare("SELECT COUNT(*) as count FROM error_reports WHERE status = 'pending'").get() as any)?.count || 0)
+        : 0;
+    } catch {
+      pendingErrorReports = 0;
+    }
+
+    const overview = sqlite.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM users) as usersTotal,
+        (SELECT COUNT(*) FROM app_users WHERE role = 'admin') as adminsTotal,
+        (SELECT COUNT(*) FROM app_users WHERE subscription_status = 'active') as activeSubscriptions,
+        (SELECT COUNT(*) FROM analytics_sessions) as visitsTotal,
+        (SELECT COUNT(DISTINCT visitor_id) FROM analytics_sessions WHERE datetime(started_at) >= datetime('now', '-6 days')) as uniqueVisitors7d,
+        (SELECT COALESCE(AVG(duration_seconds), 0) FROM analytics_sessions WHERE duration_seconds > 0) as avgSessionDurationSec
+    `).get() as any;
+
+    const tiers = sqlite.prepare(`
+      SELECT subscription_tier as tier, COUNT(*) as count
+      FROM app_users
+      GROUP BY subscription_tier
+      ORDER BY count DESC
+    `).all() as any[];
+
+    const logRows = sqlite.prepare(`
+      SELECT strftime('%Y-%m-%d', created_at) as day,
+             SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success,
+             SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed
+      FROM login_audit_logs
+      WHERE datetime(created_at) >= datetime('now', '-6 days')
+      GROUP BY strftime('%Y-%m-%d', created_at)
+      ORDER BY day ASC
+    `).all() as any[];
+
+    const topEntryPages = sqlite.prepare(`
+      SELECT entry_page as label, COUNT(*) as count
+      FROM analytics_sessions
+      WHERE entry_page IS NOT NULL AND entry_page != ''
+      GROUP BY entry_page
+      ORDER BY count DESC
+      LIMIT 6
+    `).all() as any[];
+
+    const topSources = sqlite.prepare(`
+      SELECT entry_source as label, COUNT(*) as count
+      FROM analytics_sessions
+      WHERE entry_source IS NOT NULL AND entry_source != ''
+      GROUP BY entry_source
+      ORDER BY count DESC
+      LIMIT 6
+    `).all() as any[];
+
+    const countries = sqlite.prepare(`
+      SELECT country_code as label, COUNT(*) as count
+      FROM analytics_sessions
+      WHERE country_code IS NOT NULL AND country_code != ''
+      GROUP BY country_code
+      ORDER BY count DESC
+      LIMIT 8
+    `).all() as any[];
+
+    const ages = sqlite.prepare(`
+      SELECT age_range as label, COUNT(*) as count
+      FROM analytics_sessions
+      WHERE age_range IS NOT NULL AND age_range != ''
+      GROUP BY age_range
+      ORDER BY count DESC
+      LIMIT 8
+    `).all() as any[];
+
+    const map = new Map<string, { day: string; success: number; failed: number }>();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const day = d.toISOString().slice(0, 10);
+      map.set(day, { day, success: 0, failed: 0 });
+    }
+    for (const row of logRows) {
+      if (map.has(row.day)) {
+        map.set(row.day, {
+          day: row.day,
+          success: Number(row.success || 0),
+          failed: Number(row.failed || 0),
+        });
+      }
+    }
+
+    const legalReport = await readLatestLegalMonitoringReport();
+    const legalMonitoringFindings = Number(legalReport?.counts?.total || 0);
+
+    res.json({
+      overview: {
+        ...overview,
+        pendingErrorReports,
+        legalMonitoringFindings,
+      },
+      subscriptionsByTier: tiers.map((t) => ({ tier: t.tier || "free", count: Number(t.count || 0) })),
+      loginActivity7d: Array.from(map.values()),
+      topEntryPages: topEntryPages.map((i) => ({ label: i.label, count: Number(i.count || 0) })),
+      topSources: topSources.map((i) => ({ label: i.label, count: Number(i.count || 0) })),
+      countries: countries.map((i) => ({ label: i.label, count: Number(i.count || 0) })),
+      ageRanges: ages.map((i) => ({ label: i.label, count: Number(i.count || 0) })),
+    });
+  });
+
+  app.get("/api/admin/users", isAuthenticated, isAdmin, (req, res) => {
+    const users = sqlite.prepare(`
+      SELECT u.id, u.email, u.first_name as firstName, u.last_name as lastName,
+             a.role, a.status, a.mfa_enabled as mfaEnabled,
+             a.subscription_tier as subscriptionTier, a.subscription_status as subscriptionStatus,
+             a.subscription_expires_at as subscriptionExpiresAt, a.last_login_at as lastLoginAt
+      FROM users u
+      JOIN app_users a ON a.user_id = u.id
+      ORDER BY u.created_at DESC
+      LIMIT 200
+    `).all();
+    res.json({ users });
+  });
+
+  app.patch("/api/admin/users/:id/subscription", isAuthenticated, isAdmin, (req, res) => {
+    const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const tier = String(req.body?.tier || "free");
+    const status = String(req.body?.status || "inactive");
+    const expiresAt = req.body?.expiresAt ? String(req.body.expiresAt) : null;
+    sqlite.prepare(`
+      UPDATE app_users
+      SET subscription_tier = ?, subscription_status = ?, subscription_expires_at = ?, updated_at = datetime('now')
+      WHERE user_id = ?
+    `).run(tier, status, expiresAt, userId);
+    res.json({ success: true });
   });
 
   app.get(api.sources.list.path, async (req, res) => {

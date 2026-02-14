@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useAdmin } from "@/hooks/use-admin";
 import { useEffect } from "react";
+import { useAnalytics } from "@/hooks/use-analytics";
 import NotFound from "@/pages/not-found";
 
 // Pages
@@ -16,6 +17,8 @@ import About from "@/pages/About";
 import ErrorReports from "@/pages/ErrorReports";
 import Regulations from "@/pages/Regulations";
 import UnifiedSearch from "@/pages/UnifiedSearch";
+import AuthPortal from "@/pages/AuthPortal";
+import AdminDashboard from "@/pages/AdminDashboard";
 
 // Scroll to top on every route change (fixes mobile not starting at top)
 function ScrollToTop() {
@@ -40,6 +43,8 @@ import JudgmentDetail from "@/pages/JudgmentDetail";
 import GazetteIndex from "@/pages/GazetteIndex";
 
 function Router() {
+  useAnalytics();
+
   return (
     <>
       <ScrollToTop />
@@ -51,8 +56,10 @@ function Router() {
         <Route path="/gazette" component={GazetteIndex} />
         <Route path="/search" component={UnifiedSearch} />
         <Route path="/about" component={About} />
+        <Route path="/auth" component={AuthPortal} />
         <Route path="/regulations" component={Regulations} />
         <Route path="/law/:id" component={LawDetail} />
+        <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
         <Route path="/admin/reports">{() => <AdminRoute component={ErrorReports} />}</Route>
         <Route component={NotFound} />
       </Switch>
