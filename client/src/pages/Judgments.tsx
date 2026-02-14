@@ -374,10 +374,10 @@ export default function Judgments() {
                                 <div className="mt-6 space-y-6">
                                     <div>
                                         <label className="text-sm font-medium mb-2 block">المدينة</label>
-                                        <Select value={cityFilter} onValueChange={setCityFilter}>
+                                        <Select value={cityFilter || "__all__"} onValueChange={(v) => setCityFilter(v === "__all__" ? "" : v)}>
                                             <SelectTrigger><SelectValue placeholder="جميع المدن" /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">جميع المدن</SelectItem>
+                                                <SelectItem value="__all__">جميع المدن</SelectItem>
                                                 {facets?.cities?.map((c) => (
                                                     <SelectItem key={c.city} value={c.city}>{c.city} ({c.count})</SelectItem>
                                                 ))}
@@ -386,10 +386,10 @@ export default function Judgments() {
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium mb-2 block">المحكمة</label>
-                                        <Select value={courtFilter} onValueChange={setCourtFilter}>
+                                        <Select value={courtFilter || "__all__"} onValueChange={(v) => setCourtFilter(v === "__all__" ? "" : v)}>
                                             <SelectTrigger><SelectValue placeholder="جميع المحاكم" /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">جميع المحاكم</SelectItem>
+                                                <SelectItem value="__all__">جميع المحاكم</SelectItem>
                                                 {facets?.courts?.slice(0, 20).map((c) => (
                                                     <SelectItem key={c.court} value={c.court}>{c.court} ({c.count})</SelectItem>
                                                 ))}
@@ -400,10 +400,10 @@ export default function Judgments() {
                                         <label className="text-sm font-medium mb-2 block">
                                             {activeTab === "eg_naqd" ? "السنة القضائية" : "السنة"}
                                         </label>
-                                        <Select value={yearFilter} onValueChange={setYearFilter}>
+                                        <Select value={yearFilter || "__all__"} onValueChange={(v) => setYearFilter(v === "__all__" ? "" : v)}>
                                             <SelectTrigger><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">جميع السنوات</SelectItem>
+                                                <SelectItem value="__all__">جميع السنوات</SelectItem>
                                                 {facets?.years?.map((y) => (
                                                     <SelectItem key={y.year} value={y.year.toString()}>
                                                         {y.year}{activeTab === "eg_naqd" ? "" : "هـ"} ({y.count})

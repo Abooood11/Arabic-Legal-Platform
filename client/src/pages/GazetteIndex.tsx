@@ -267,10 +267,10 @@ export default function GazetteIndex() {
                                 <div className="mt-6 space-y-6">
                                     <div>
                                         <label className="text-sm font-medium mb-2 block">التصنيف النوعي</label>
-                                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                                        <Select value={categoryFilter || "__all__"} onValueChange={(v) => setCategoryFilter(v === "__all__" ? "" : v)}>
                                             <SelectTrigger><SelectValue placeholder="جميع التصنيفات" /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">جميع التصنيفات</SelectItem>
+                                                <SelectItem value="__all__">جميع التصنيفات</SelectItem>
                                                 {facets?.categories?.map((c) => (
                                                     <SelectItem key={c.category} value={c.category}>
                                                         {c.category} ({c.count.toLocaleString("en")})
@@ -281,10 +281,10 @@ export default function GazetteIndex() {
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium mb-2 block">سنة الإصدار (العدد)</label>
-                                        <Select value={yearFilter} onValueChange={setYearFilter}>
+                                        <Select value={yearFilter || "__all__"} onValueChange={(v) => setYearFilter(v === "__all__" ? "" : v)}>
                                             <SelectTrigger><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">جميع السنوات</SelectItem>
+                                                <SelectItem value="__all__">جميع السنوات</SelectItem>
                                                 {facets?.years?.map((y) => (
                                                     <SelectItem key={y.year} value={y.year.toString()}>
                                                         {y.year} ({y.count.toLocaleString("en")})
@@ -295,10 +295,10 @@ export default function GazetteIndex() {
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium mb-2 block">سنة التشريع</label>
-                                        <Select value={legYearFilter} onValueChange={setLegYearFilter}>
+                                        <Select value={legYearFilter || "__all__"} onValueChange={(v) => setLegYearFilter(v === "__all__" ? "" : v)}>
                                             <SelectTrigger><SelectValue placeholder="جميع السنوات" /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">جميع السنوات</SelectItem>
+                                                <SelectItem value="__all__">جميع السنوات</SelectItem>
                                                 {facets?.legislationYears?.map((y) => (
                                                     <SelectItem key={y.year} value={y.year}>
                                                         {y.year} ({y.count.toLocaleString("en")})
