@@ -65,6 +65,17 @@ const saudiGazetteCategoryCaseSql = (alias: string) => `
   END
 `;
 
+function buildGazetteIssuePdfUrl(issueNumber?: string | null): string | null {
+  const normalized = String(issueNumber || "").trim();
+  if (!normalized) return null;
+
+  const template =
+    process.env.UQN_ISSUE_PDF_URL_TEMPLATE ||
+    "https://www.uqn.gov.sa/IssuePdf?issueNumber={issueNumber}";
+
+  return template.replace("{issueNumber}", encodeURIComponent(normalized));
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1010,7 +1021,10 @@ export async function registerRoutes(
             ORDER BY rank
             LIMIT ? OFFSET ?
           `);
-          const results = dataStmt.all(ftsQuery, ...params, limit, offset);
+          const results = (dataStmt.all(ftsQuery, ...params, limit, offset) as any[]).map((item) => ({
+            ...item,
+            issuePdfUrl: buildGazetteIssuePdfUrl(item.issueNumber),
+          }));
 
           return res.json({
             data: results,
@@ -1505,7 +1519,10 @@ export async function registerRoutes(
         ORDER BY g.issue_year DESC
         LIMIT ? OFFSET ?
       `);
-      const results = dataStmt.all(...params, limit, offset);
+      const results = (dataStmt.all(...params, limit, offset) as any[]).map((item) => ({
+        ...item,
+        issuePdfUrl: buildGazetteIssuePdfUrl(item.issueNumber),
+      }));
 
       const countStmt = sqlite.prepare(`
         SELECT count(*) as count
