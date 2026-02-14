@@ -4,9 +4,15 @@ dist
 *.csv
 data.db-shm
 data.db-wal
+data.db.gz
+data_backup_pre_fixes.db
+*_backup*.db
 deploy_monitor.py
 deploy_monitor.log
 deploy_status.json
 boe_laws
+boe_laws_backup
+scripts/boe_laws_backup
 BOE_*.md
 SEARCH_*.md
+.env
