@@ -62,11 +62,6 @@ export function Navbar() {
             >
               <link.icon className="w-5 h-5" />
               {link.label}
-              {link.href === "/search" && (
-                <kbd className="hidden lg:inline-flex items-center text-[10px] font-mono bg-muted/80 text-muted-foreground px-1.5 py-0.5 rounded border mr-0.5">
-                  Ctrl+K
-                </kbd>
-              )}
             </Link>
           ))}
         </nav>
