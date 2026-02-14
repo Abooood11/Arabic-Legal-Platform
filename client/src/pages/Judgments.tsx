@@ -90,18 +90,18 @@ const TABS: { key: SourceTab; label: string; shortLabel: string; icon: React.Rea
         label: "المحاكم السعودية",
         shortLabel: "السعودية",
         icon: <Landmark className="h-4 w-4" />,
-        color: "text-muted-foreground hover:text-emerald-700 hover:bg-emerald-50 border-transparent",
-        activeColor: "bg-emerald-600 text-white shadow-md border-emerald-600",
-        badgeColor: "border-emerald-300 text-emerald-700 bg-emerald-50",
+        color: "text-muted-foreground hover:text-primary hover:bg-primary/5 border-transparent",
+        activeColor: "bg-primary text-primary-foreground shadow-md border-primary",
+        badgeColor: "border-primary/30 text-primary bg-primary/5",
     },
     {
         key: "eg_naqd",
         label: "الأحكام المصرية",
         shortLabel: "مصر",
         icon: <Scale className="h-4 w-4" />,
-        color: "text-muted-foreground hover:text-amber-700 hover:bg-amber-50 border-transparent",
-        activeColor: "bg-amber-600 text-white shadow-md border-amber-600",
-        badgeColor: "border-amber-300 text-amber-700 bg-amber-50",
+        color: "text-muted-foreground hover:text-accent-foreground hover:bg-accent/10 border-transparent",
+        activeColor: "bg-accent text-accent-foreground shadow-md border-accent",
+        badgeColor: "border-accent/30 text-accent-foreground bg-accent/10",
     },
 ];
 
@@ -138,14 +138,14 @@ function HighlightedSnippet({ text }: { text: string }) {
 function SourceBadge({ source }: { source?: string }) {
     if (source === "eg_naqd") {
         return (
-            <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 text-[11px] gap-1">
+            <Badge variant="outline" className="border-accent/30 text-accent-foreground bg-accent/10 text-[11px] gap-1">
                 <Scale className="h-3 w-3" />
                 مصر
             </Badge>
         );
     }
     return (
-        <Badge variant="outline" className="border-emerald-300 text-emerald-700 bg-emerald-50 text-[11px] gap-1">
+        <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5 text-[11px] gap-1">
             <Landmark className="h-3 w-3" />
             السعودية
         </Badge>
@@ -242,16 +242,16 @@ export default function Judgments() {
         <div className="min-h-screen bg-muted/20">
             {/* Judge filter banner */}
             {judgeFilter && (
-                <div className="bg-emerald-50 border-b border-emerald-200">
+                <div className="bg-primary/5 border-b border-primary/20">
                     <div className="container mx-auto px-4 py-3 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                            <Gavel className="h-5 w-5 text-emerald-700" />
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <Gavel className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
-                            <div className="text-xs text-emerald-600 font-medium">أحكام القاضي</div>
-                            <div className="text-base font-bold text-emerald-800">{judgeFilter}</div>
+                            <div className="text-xs text-primary font-medium">أحكام القاضي</div>
+                            <div className="text-base font-bold text-foreground">{judgeFilter}</div>
                         </div>
-                        <Button variant="outline" size="sm" className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 gap-1" onClick={clearJudgeFilter}>
+                        <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10 gap-1" onClick={clearJudgeFilter}>
                             <X className="h-3.5 w-3.5" />
                             مسح
                         </Button>
@@ -417,7 +417,7 @@ export default function Judgments() {
                             </Badge>
                         )}
                         {judgeFilter && (
-                            <Badge variant="secondary" className="gap-1 text-xs cursor-pointer bg-emerald-100 text-emerald-800" onClick={clearJudgeFilter}>
+                            <Badge variant="secondary" className="gap-1 text-xs cursor-pointer bg-primary/10 text-primary" onClick={clearJudgeFilter}>
                                 <Gavel className="h-3 w-3" />
                                 {judgeFilter} <X className="h-3 w-3" />
                             </Badge>
@@ -457,7 +457,7 @@ export default function Judgments() {
                                 return (
                                     <Link key={item.id} href={`/judgments/${item.id}`} className="block">
                                         <div className={`group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer ${
-                                            isEg ? "border-r-4 border-r-amber-400" : "border-r-4 border-r-emerald-400"
+                                            isEg ? "border-r-4 border-r-accent" : "border-r-4 border-r-primary"
                                         }`}>
                                             {/* Top row: source badge + metadata */}
                                             <div className="flex items-start justify-between gap-3 mb-2">

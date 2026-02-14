@@ -163,11 +163,11 @@ function PreambleSection({ title, text }: PreambleSectionProps) {
         className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-300 shadow-sm ${
           isOpen
             ? "bg-primary/5 border-primary/30 text-primary"
-            : "bg-white border-slate-200 text-slate-700 hover:border-primary/20 hover:bg-slate-50"
+            : "bg-background border-border text-foreground hover:border-primary/20 hover:bg-muted"
         }`}
       >
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg transition-colors ${isOpen ? "bg-primary/10" : "bg-slate-100"}`}>
+          <div className={`p-2 rounded-lg transition-colors ${isOpen ? "bg-primary/10" : "bg-muted"}`}>
             <Scale className="w-4 h-4" />
           </div>
           <span className="font-bold text-base">{title}</span>
@@ -180,7 +180,7 @@ function PreambleSection({ title, text }: PreambleSectionProps) {
           isOpen ? "max-h-[8000px] opacity-100 mt-3" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="bg-white border border-primary/10 rounded-xl p-8 shadow-sm">
+        <div className="bg-background border border-primary/10 rounded-xl p-8 shadow-sm">
           <div className="text-base leading-relaxed text-foreground min-w-0" style={{ direction: 'rtl' }}>
             {classified.map((item, idx) => {
               const normalized = toHindiNumerals(normalizeArabicDate(item.text));
@@ -325,12 +325,12 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
         className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-300 shadow-sm ${
           isOpen 
             ? "bg-primary/5 border-primary/30 text-primary" 
-            : "bg-white border-slate-200 text-slate-700 hover:border-primary/20 hover:bg-slate-50"
+            : "bg-background border-border text-foreground hover:border-primary/20 hover:bg-muted"
         }`}
         data-testid="button-toggle-royal-decree"
       >
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg transition-colors ${isOpen ? "bg-primary/10" : "bg-slate-100"}`}>
+          <div className={`p-2 rounded-lg transition-colors ${isOpen ? "bg-primary/10" : "bg-muted"}`}>
             <Scale className="w-4 h-4" />
           </div>
           <span className="font-bold text-base">المرسوم الملكي وقرار مجلس الوزراء</span>
@@ -343,7 +343,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
           isOpen ? "max-h-[12000px] opacity-100 mt-3" : "max-h-0 opacity-0 overflow-hidden"
         }`}
       >
-        <div className="bg-white border border-primary/10 rounded-xl p-8 shadow-sm" style={{ direction: 'rtl' }}>
+        <div className="bg-background border border-primary/10 rounded-xl p-8 shadow-sm" style={{ direction: 'rtl' }}>
           {/* Basmala */}
           {preamble?.basmala && (
             <div className="text-center font-bold text-lg text-foreground my-4">
@@ -395,7 +395,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
                     {article.items.map((item, itemIdx) => (
                       <div key={itemIdx} className="space-y-2">
                         <div className="flex gap-1.5 items-start">
-                          <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{toHindiNumerals(item.marker)}</div>
+                          <div className="font-semibold text-primary whitespace-nowrap shrink-0">{toHindiNumerals(item.marker)}</div>
                           <div className="text-foreground leading-relaxed flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{toHindiNumerals(item.text)}</div>
                         </div>
 
@@ -405,7 +405,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
                             {item.sub_items.map((subItem, subIdx) => (
                               <div key={subIdx} className="flex gap-1.5 items-start">
                                 {subItem.marker && (
-                                  <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{subItem.marker}</div>
+                                  <div className="font-semibold text-primary whitespace-nowrap shrink-0">{subItem.marker}</div>
                                 )}
                                 <div className="text-foreground leading-relaxed text-sm flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{toHindiNumerals(subItem.text)}</div>
                               </div>
@@ -426,7 +426,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
           </div>
 
           {/* Separator */}
-          <div className="border-t border-slate-200 my-8" />
+          <div className="border-t border-border my-8" />
 
           {/* Cabinet Decision */}
           {cabinetDecision && (
@@ -467,7 +467,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
                           {provision.items.map((item: any, itemIdx: number) => (
                             <div key={itemIdx} className="space-y-2">
                               <div className="flex gap-1.5 items-start">
-                                <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{item.marker}</div>
+                                <div className="font-semibold text-primary whitespace-nowrap shrink-0">{item.marker}</div>
                                 <div className="text-foreground leading-relaxed flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{item.text}</div>
                               </div>
                               {item.sub_items && item.sub_items.length > 0 && (
@@ -475,7 +475,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
                                   {item.sub_items.map((subItem: any, subIdx: number) => (
                                     <div key={subIdx} className="flex gap-1.5 items-start">
                                       {subItem.marker && (
-                                        <div className="font-semibold text-emerald-600 whitespace-nowrap shrink-0">{subItem.marker}</div>
+                                        <div className="font-semibold text-primary whitespace-nowrap shrink-0">{subItem.marker}</div>
                                       )}
                                       <div className="text-foreground leading-relaxed text-sm flex-1 min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{subItem.text}</div>
                                     </div>
@@ -705,39 +705,41 @@ export default function LawDetail() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Sticky Location Breadcrumb Bar - Below Navbar (h-16 = 64px = top-16) */}
+      {/* Sticky Location Breadcrumb Bar - Below Navbar (h-20 = 80px = top-20) */}
       {showBreadcrumbs && (
-        <div 
-          className="bg-white border-b border-slate-200/80 sticky top-16 z-40" 
+        <div
+          className="bg-background/95 backdrop-blur-sm border-b border-border/80 sticky top-20 z-40"
           style={{ direction: 'rtl' }}
           data-testid="location-breadcrumb-bar"
         >
           <div className="container max-w-5xl mx-auto px-4 py-2">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm w-full">
-              <MapPin className="w-4 h-4 text-[#1a8a70] shrink-0" />
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 flex-1">
-                {getBreadcrumbItems().length > 0 ? (
-                  getBreadcrumbItems().map((item, index) => (
-                    <span key={index} className="flex items-center gap-2">
-                      {index > 0 && <span className="text-slate-400">›</span>}
-                      <button
-                        onClick={() => scrollToSection(item.fullLabel)}
-                        className="text-slate-700 hover:text-[#1a8a70] transition-colors cursor-pointer"
-                        data-testid={`breadcrumb-item-${index}`}
-                      >
-                        {item.fullLabel}
-                      </button>
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-slate-700">{law.law_name || law.title_ar}</span>
-                )}
+            <div className="flex items-center gap-x-2 text-sm w-full">
+              <MapPin className="w-4 h-4 text-primary shrink-0" />
+              <div className="flex items-center gap-x-2 flex-1 min-w-0 overflow-x-auto custom-scrollbar" style={{ scrollbarWidth: 'thin' }}>
+                <div className="flex items-center gap-x-2 whitespace-nowrap">
+                  {getBreadcrumbItems().length > 0 ? (
+                    getBreadcrumbItems().map((item, index) => (
+                      <span key={index} className="flex items-center gap-2">
+                        {index > 0 && <span className="text-muted-foreground">›</span>}
+                        <button
+                          onClick={() => scrollToSection(item.fullLabel)}
+                          className="text-foreground hover:text-primary transition-colors cursor-pointer whitespace-nowrap"
+                          data-testid={`breadcrumb-item-${index}`}
+                        >
+                          {item.fullLabel}
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-foreground">{law.law_name || law.title_ar}</span>
+                  )}
+                </div>
               </div>
-              
+
               <div className="flex items-center gap-3 shrink-0 mr-auto">
                 <button
                   onClick={() => setShowBreadcrumbs(false)}
-                  className="text-[12px] font-bold text-[#1a8a70] hover:underline transition-all flex items-center gap-1"
+                  className="text-[12px] font-bold text-primary hover:underline transition-all flex items-center gap-1"
                   data-testid="button-hide-breadcrumbs"
                 >
                   إخفاء المسار
@@ -745,9 +747,9 @@ export default function LawDetail() {
 
                 {isAdmin && (
                   <Link href="/admin/reports">
-                    <Badge 
-                      variant="outline" 
-                      className="text-[10px] h-5 px-1.5 text-amber-600 border-amber-300 bg-amber-50 cursor-pointer hover:bg-amber-100"
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] h-5 px-1.5 text-accent-foreground border-accent/30 bg-accent/10 cursor-pointer hover:bg-accent/20"
                       data-testid="link-admin-reports"
                     >
                       <AlertTriangle className="w-3 h-3 ml-1" />
@@ -767,7 +769,7 @@ export default function LawDetail() {
           <Button
             size="sm"
             onClick={() => setShowBreadcrumbs(true)}
-            className="rounded-full shadow-lg bg-[#1a8a70] hover:bg-[#1a8a70]/90 text-white flex items-center gap-2 px-4"
+            className="rounded-full shadow-lg bg-primary hover:bg-primary/90 text-white flex items-center gap-2 px-4"
             data-testid="button-show-breadcrumbs"
           >
             <MapPin className="w-4 h-4" />
@@ -833,8 +835,8 @@ export default function LawDetail() {
             onClick={() => setShowAllRegulations(!showAllRegulations)}
             className={`rounded-full shadow-lg flex items-center gap-2 px-4 backdrop-blur-sm ${
               showAllRegulations 
-                ? 'bg-[#1a8a70]/90 hover:bg-[#1a8a70] text-white' 
-                : 'bg-white/80 hover:bg-white/95 text-[#1a8a70] border border-[#1a8a70]/50'
+                ? 'bg-primary/90 hover:bg-primary text-white' 
+                : 'bg-background/80 hover:bg-background/95 text-primary border border-primary/50'
             }`}
             data-testid="button-toggle-all-regulations"
           >
@@ -930,20 +932,34 @@ export default function LawDetail() {
                       )}
                     </div>
                   )}
-                  <div className={`article-container group ${isRepealed ? 'border-r-4 border-red-500/50' : ''}`} data-testid={`article-container-${article.number}`}>
-                    <div className={`article-number-heading ${isRepealed ? 'text-red-600' : ''}`}>
-                      {(() => {
-                        const numberText = article.number_text || article.number.toString();
-                        // Ensure "المادة" is always present and not duplicated
-                        const hasAlMadda = numberText.includes('المادة');
-                        const displayText = hasAlMadda ? numberText : `المادة ${numberText}`;
-                        return toHindiNumerals(displayText);
-                      })()}
-                      {isRepealed && <span className="mr-2 text-xs font-normal text-red-500">(ملغاة)</span>}
+                  <div className={`article-container group`} data-testid={`article-container-${article.number}`}>
+                    <div className="article-number-heading">
+                      {isRepealed ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="inline-block border border-red-300 bg-red-50/50 rounded-md px-3 py-0.5">
+                            {(() => {
+                              const numberText = article.number_text || article.number.toString();
+                              const hasAlMadda = numberText.includes('المادة');
+                              const displayText = hasAlMadda ? numberText : `المادة ${numberText}`;
+                              return toHindiNumerals(displayText);
+                            })()}
+                          </span>
+                          <span className="text-[11px] font-bold text-red-500 bg-red-50 border border-red-200 rounded px-2 py-0.5">ملغاة</span>
+                        </span>
+                      ) : (
+                        <>
+                          {(() => {
+                            const numberText = article.number_text || article.number.toString();
+                            const hasAlMadda = numberText.includes('المادة');
+                            const displayText = hasAlMadda ? numberText : `المادة ${numberText}`;
+                            return toHindiNumerals(displayText);
+                          })()}
+                        </>
+                      )}
                     </div>
-                    
+
                     <div className="article-text-wrapper">
-                      <div className={`prose-law ${isRepealed ? 'text-red-600/80' : ''}`}>
+                      <div className="prose-law">
                     {hasOverride ? (
                       <div className="space-y-2">
                         {displayText.split('\n').map((line: string, idx: number) => {
@@ -1167,9 +1183,9 @@ export default function LawDetail() {
                                   <table className="w-full border-collapse text-sm" style={{ direction: 'rtl' }}>
                                     <tbody>
                                       {vp.tableRows.map((row: string[], ri: number) => (
-                                        <tr key={ri} className={ri % 2 === 0 ? 'bg-amber-50/40' : 'bg-white'}>
+                                        <tr key={ri} className={ri % 2 === 0 ? 'bg-accent/10/40' : 'bg-background'}>
                                           {row.map((cell: string, ci: number) => (
-                                            <td key={ci} className="border border-slate-200 px-4 py-2.5 text-right">
+                                            <td key={ci} className="border border-border px-4 py-2.5 text-right">
                                               {toHindiNumerals(cell)}
                                             </td>
                                           ))}
@@ -1241,19 +1257,19 @@ export default function LawDetail() {
 
                       {/* Amendments (التعديلات) - For BOE laws */}
                       {(article as any).amendments && (article as any).amendments.length > 0 && (
-                        <div className="mt-4 border-r-4 border-amber-400/40 bg-amber-50/30 rounded-lg p-4">
+                        <div className="mt-4 border-r-4 border-amber-400/60 bg-amber-50/40 rounded-lg p-4">
                           <div className="flex items-center gap-2 mb-3">
                             <AlertTriangle className="w-4 h-4 text-amber-600" />
                             <span className="font-bold text-amber-800">مادة معدلة</span>
-                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-amber-600 border-amber-300 bg-amber-50">
+                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-amber-700 border-amber-300 bg-amber-50">
                               {(article as any).amendments.length} تعديل
                             </Badge>
                           </div>
                           <div className="space-y-3">
                             {(article as any).amendments.map((amendment: any, idx: number) => (
-                              <div key={idx} className="bg-white rounded-md p-3 border border-amber-200/50">
+                              <div key={idx} className="bg-background rounded-md p-3 border border-amber-200/60">
                                 {amendment.decree && (
-                                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                                  <div className="text-xs text-accent-foreground font-semibold mb-1">
                                     المرسوم: {toHindiNumerals(amendment.decree)}
                                     {amendment.date && <span className="mr-2">• التاريخ: {toHindiNumerals(amendment.date)}</span>}
                                   </div>
@@ -1267,7 +1283,7 @@ export default function LawDetail() {
                                   // If no content_parts, fall back to plain description
                                   if (parts.length === 0 && amendment.description) {
                                     return (
-                                      <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap" style={{ direction: 'rtl' }}>
+                                      <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap" style={{ direction: 'rtl' }}>
                                         {amendment.description}
                                       </div>
                                     );
@@ -1286,9 +1302,9 @@ export default function LawDetail() {
                                               <table className="w-full border-collapse text-sm" style={{ direction: 'rtl' }}>
                                                 <tbody>
                                                   {part.table_rows.map((row: string[], ri: number) => (
-                                                    <tr key={ri} className={ri % 2 === 0 ? 'bg-amber-50/40' : 'bg-white'}>
+                                                    <tr key={ri} className={ri % 2 === 0 ? 'bg-accent/10/40' : 'bg-background'}>
                                                       {row.map((cell: string, ci: number) => (
-                                                        <td key={ci} className="border border-amber-200 px-4 py-2 text-right">
+                                                        <td key={ci} className="border border-accent/20 px-4 py-2 text-right">
                                                           {toHindiNumerals(cell)}
                                                         </td>
                                                       ))}
@@ -1314,7 +1330,7 @@ export default function LawDetail() {
                                               if (letterMatch) {
                                                 lastLineHadMarker = true;
                                                 return (
-                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-slate-700" style={{ direction: 'rtl', marginRight: '16px' }}>
+                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-foreground" style={{ direction: 'rtl', marginRight: '16px' }}>
                                                     <span className="font-bold text-primary shrink-0">{letterMatch[1]}-</span>
                                                     <span className="leading-relaxed">{toHindiNumerals(trimmed.slice(letterMatch[0].length))}</span>
                                                   </div>
@@ -1323,7 +1339,7 @@ export default function LawDetail() {
                                               if (numMatch) {
                                                 lastLineHadMarker = true;
                                                 return (
-                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-slate-700" style={{ direction: 'rtl', marginRight: '16px' }}>
+                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-foreground" style={{ direction: 'rtl', marginRight: '16px' }}>
                                                     <span className="font-bold text-primary shrink-0">{toHindiNumerals(numMatch[1])}-</span>
                                                     <span className="leading-relaxed">{toHindiNumerals(trimmed.slice(numMatch[0].length))}</span>
                                                   </div>
@@ -1332,7 +1348,7 @@ export default function LawDetail() {
 
                                               lastLineHadMarker = false;
                                               return (
-                                                <div key={li} className="text-sm text-slate-700 leading-relaxed my-1" style={{ direction: 'rtl' }}>
+                                                <div key={li} className="text-sm text-foreground leading-relaxed my-1" style={{ direction: 'rtl' }}>
                                                   {toHindiNumerals(trimmed)}
                                                 </div>
                                               );
@@ -1344,9 +1360,9 @@ export default function LawDetail() {
                                   );
                                 })()}
                                 {amendment.new_text && (
-                                  <div className="mt-2 pt-2 border-t border-amber-100">
-                                    <div className="text-xs text-amber-600 font-medium mb-1">النص الجديد:</div>
-                                    <div className="text-sm text-slate-600 bg-amber-50 rounded px-2 py-1 whitespace-pre-wrap" style={{ direction: 'rtl' }}>
+                                  <div className="mt-2 pt-2 border-t border-accent/15">
+                                    <div className="text-xs text-accent-foreground font-medium mb-1">النص الجديد:</div>
+                                    <div className="text-sm text-muted-foreground bg-accent/10 rounded px-2 py-1 whitespace-pre-wrap" style={{ direction: 'rtl' }}>
                                       {amendment.new_text}
                                     </div>
                                   </div>
@@ -1362,7 +1378,7 @@ export default function LawDetail() {
                         <div className="mt-4" data-testid={`regulations-panel-${article.number}`}>
                           <button
                             onClick={() => setOpenRegulationsId(openRegulationsId === article.number ? null : article.number)}
-                            className="flex items-center gap-2 text-[#1a8a70] hover:text-[#1a8a70]/80 transition-colors"
+                            className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
                             data-testid={`button-toggle-regulations-${article.number}`}
                           >
                             <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${openRegulationsId === article.number ? 'rotate-180' : ''}`} />
@@ -1371,18 +1387,18 @@ export default function LawDetail() {
                           
                           {(openRegulationsId === article.number || showAllRegulations) && (
                             <div 
-                              className="mt-3 bg-slate-50 dark:bg-slate-900/50 border-r-4 border-[#1a8a70]/40 rounded-md p-5 shadow-sm ring-1 ring-slate-200 dark:ring-slate-800"
+                              className="mt-3 bg-muted dark:bg-muted border-r-4 border-primary/40 rounded-md p-5 shadow-sm ring-1 ring-border dark:ring-border"
                             >
-                              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-800">
+                              <div className="flex items-center justify-between mb-4 pb-3 border-b border-border dark:border-border">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-[#1a8a70] text-base">اللائحة التنفيذية</span>
-                                  <span className="text-xs text-muted-foreground px-2 py-0.5 bg-slate-200/50 dark:bg-slate-800 rounded-full">
+                                  <span className="font-bold text-primary text-base">اللائحة التنفيذية</span>
+                                  <span className="text-xs text-muted-foreground px-2 py-0.5 bg-muted dark:bg-primary rounded-full">
                                     {toHindiNumerals(article.regulations.length.toString())} بند
                                   </span>
                                 </div>
                                 <button
                                   onClick={() => setOpenRegulationsId(null)}
-                                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                                  className="text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground p-1.5 rounded-full hover:bg-muted dark:hover:bg-muted transition-colors"
                                   title="إغلاق"
                                 >
                                   <X className="w-4 h-4" />
@@ -1393,8 +1409,8 @@ export default function LawDetail() {
                                   const isRegRepealed = reg.status === 'ملغاة';
                                   return (
                                   <div key={regIdx} data-testid={`regulation-item-${article.number}-${regIdx}`} className={isRegRepealed ? 'opacity-60' : ''}>
-                                    {isRegRepealed && <span className="text-xs font-medium text-red-500 mb-1 block">(ملغاة)</span>}
-                                    <NumberedItem marker={toHindiNumerals(reg.number)} markerColor={isRegRepealed ? "text-red-400" : "text-[#1a8a70]"}>
+                                    {isRegRepealed && <span className="text-[11px] font-medium text-red-500 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 mb-1 inline-block">(ملغاة)</span>}
+                                    <NumberedItem marker={toHindiNumerals(reg.number)} markerColor={isRegRepealed ? "text-muted-foreground" : "text-primary"}>
                                       <ArticleReferenceText
                                         text={reg.text}
                                         articles={law.articles}
@@ -1408,7 +1424,7 @@ export default function LawDetail() {
                                               key={subIdx} 
                                               marker={toHindiNumerals(sub.marker)} 
                                               level={1}
-                                              markerColor="text-[#1a8a70]"
+                                              markerColor="text-primary"
                                               data-testid={`regulation-subitem-${article.number}-${regIdx}-${subIdx}`}
                                             >
                                               <ArticleReferenceText
@@ -1437,8 +1453,8 @@ export default function LawDetail() {
                       onClick={() => handleCopy(article)}
                       className={`p-1 rounded transition-colors ${
                         copyingId === article.number 
-                          ? "text-[#1a8a70]" 
-                          : "text-[#aaa] hover:text-[#666]"
+                          ? "text-primary" 
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                       title={copyingId === article.number ? "تم النسخ" : "نسخ المادة"}
                       data-testid={`button-copy-article-${article.number}`}
@@ -1452,7 +1468,7 @@ export default function LawDetail() {
 
                     <button
                       onClick={() => setReportingArticle(article.number)}
-                      className="p-1 rounded text-[#aaa] hover:text-[#666] transition-colors"
+                      className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
                       title="إبلاغ عن خطأ"
                       data-testid={`button-report-article-${article.number}`}
                     >
@@ -1462,7 +1478,7 @@ export default function LawDetail() {
                     {isAdmin && (
                       <button
                         onClick={() => setEditingArticle({ number: article.number, text: article.text })}
-                        className="p-1 rounded text-amber-400 hover:text-amber-600 transition-colors"
+                        className="p-1 rounded text-accent hover:text-accent-foreground transition-colors"
                         title="تحرير المادة"
                         data-testid={`button-edit-article-${article.number}`}
                       >
@@ -1480,14 +1496,14 @@ export default function LawDetail() {
                         onClick={() => toggleComparative(article.number)}
                         className={`h-8 px-3 gap-2 transition-all duration-200 border shadow-sm whitespace-nowrap text-xs ${
                           isOpen 
-                            ? "text-[#1a8a70] bg-[#1a8a70]/10 border-[#1a8a70]/30 hover:bg-[#1a8a70]/15" 
-                            : "text-slate-500 border-slate-200 hover:text-[#1a8a70] hover:bg-[#1a8a70]/5"
+                            ? "text-primary bg-primary/10 border-primary/30 hover:bg-primary/15" 
+                            : "text-muted-foreground border-border hover:text-primary hover:bg-primary/5"
                         }`}
                         data-testid={`button-comparative-article-${article.number}`}
                       >
                         <Scale className="w-3.5 h-3.5" />
                         <span className="font-medium">قارن مع قوانين في دول أخرى</span>
-                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-slate-100 text-slate-600">
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-muted text-muted-foreground">
                           {comparativeCount}
                         </Badge>
                         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
@@ -1502,14 +1518,14 @@ export default function LawDetail() {
                         isOpen ? "max-h-[2000px] opacity-100 mt-5" : "max-h-0 opacity-0 overflow-hidden"
                       }`}
                     >
-                      <div className="bg-gradient-to-b from-slate-50 to-slate-100/50 border border-slate-200 rounded-xl p-5">
+                      <div className="bg-gradient-to-b from-slate-50 to-slate-100/50 border border-border rounded-xl p-5">
                         {/* Header */}
-                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-border">
                           <div className="flex items-center gap-2">
-                            <Scale className="w-4 h-4 text-[#1a8a70]" />
-                            <h4 className="text-sm font-bold text-slate-700">المواد المقارنة</h4>
+                            <Scale className="w-4 h-4 text-primary" />
+                            <h4 className="text-sm font-bold text-foreground">المواد المقارنة</h4>
                           </div>
-                          <Badge className="bg-[#1a8a70]/10 text-[#1a8a70] border-none text-[10px]">
+                          <Badge className="bg-primary/10 text-primary border-none text-[10px]">
                             {comparativeCount} نتيجة
                           </Badge>
                         </div>
@@ -1522,17 +1538,17 @@ export default function LawDetail() {
                               href={item.source_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block bg-white rounded-lg border border-slate-200 p-4 hover:border-[#1a8a70]/40 hover:shadow-md transition-all duration-200 group/item"
+                              className="block bg-background rounded-lg border border-border p-4 hover:border-primary/40 hover:shadow-md transition-all duration-200 group/item"
                               data-testid={`link-comparative-${article.number}-${idx}`}
                             >
                               {/* Country & Law Header */}
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3">
                                   <div>
-                                    <div className="text-sm font-bold text-slate-700 group-hover/item:text-[#1a8a70] transition-colors">
+                                    <div className="text-sm font-bold text-foreground group-hover/item:text-primary transition-colors">
                                       {item.law_name_ar}
                                     </div>
-                                    <div className="text-xs text-slate-400">
+                                    <div className="text-xs text-muted-foreground">
                                       المادة {item.article_no}
                                     </div>
                                   </div>
@@ -1540,7 +1556,7 @@ export default function LawDetail() {
                               </div>
 
                               {/* Article Text */}
-                              <div className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3 border-r-4 border-[#1a8a70]/30">
+                              <div className="text-sm text-muted-foreground leading-relaxed bg-muted rounded-lg p-3 border-r-4 border-primary/30">
                                 {item.article_text_ar}
                               </div>
                             </a>
@@ -1555,16 +1571,16 @@ export default function LawDetail() {
             });
           })()
         ) : (
-          <div className="text-center py-24 bg-white rounded-2xl border border-dashed border-slate-200">
-            <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-slate-300" />
+          <div className="text-center py-24 bg-background rounded-2xl border border-dashed border-border">
+            <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-muted-foreground/50" />
             </div>
-            <h3 className="text-lg font-bold text-slate-700 mb-1">لم نعثر على نتائج</h3>
-            <p className="text-slate-400 mb-6">جرب البحث بكلمات مختلفة أو رقم المادة</p>
+            <h3 className="text-lg font-bold text-foreground mb-1">لم نعثر على نتائج</h3>
+            <p className="text-muted-foreground mb-6">جرب البحث بكلمات مختلفة أو رقم المادة</p>
             <Button 
               variant="outline" 
               onClick={() => setSearchQuery("")} 
-              className="text-[#1a8a70] border-[#1a8a70]/20 hover:bg-[#1a8a70]/5"
+              className="text-primary border-primary/20 hover:bg-primary/5"
               data-testid="button-show-all-articles"
             >
               عرض جميع المواد
@@ -1586,7 +1602,7 @@ export default function LawDetail() {
         <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader className="pr-6">
             <DialogTitle className="flex items-center gap-2 text-lg">
-              <AlertCircle className="w-5 h-5 text-slate-400" />
+              <AlertCircle className="w-5 h-5 text-muted-foreground" />
               <span>الإبلاغ عن خطأ في المادة {reportingArticle ? toHindiNumerals(reportingArticle.toString()) : ""}</span>
             </DialogTitle>
           </DialogHeader>
@@ -1595,7 +1611,7 @@ export default function LawDetail() {
               placeholder="صف الخطأ الموجود في النص..."
               value={reportText}
               onChange={(e) => setReportText(e.target.value)}
-              className="min-h-[120px] text-sm resize-none focus-visible:ring-slate-200"
+              className="min-h-[120px] text-sm resize-none focus-visible:ring-border"
               data-testid="textarea-report-modal"
             />
           </div>
@@ -1613,7 +1629,7 @@ export default function LawDetail() {
             <Button
               onClick={() => reportingArticle && handleSubmitReport(reportingArticle)}
               disabled={!reportText.trim() || isSubmittingReport}
-              className="flex-1 bg-slate-800 hover:bg-slate-900"
+              className="flex-1 bg-primary hover:bg-primary/90"
             >
               {isSubmittingReport ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

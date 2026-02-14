@@ -55,9 +55,10 @@ export function Footer() {
             <div>
               <h3 className="font-semibold mb-4 text-primary">روابط سريعة</h3>
               <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><Link href="/library" className="hover:text-primary transition-colors" data-testid="link-footer-library">المكتبة القانونية</Link></li>
-                <li><Link href="/about" className="hover:text-primary transition-colors" data-testid="link-footer-about">عن المنصة</Link></li>
-                <li><a href="#" className="hover:text-primary transition-colors" data-testid="link-footer-terms">سياسة الاستخدام</a></li>
+                <li><Link href="/library" className="hover:text-primary transition-colors" data-testid="link-footer-library">الأنظمة</Link></li>
+                <li><Link href="/judgments" className="hover:text-primary transition-colors" data-testid="link-footer-judgments">الأحكام القضائية</Link></li>
+                <li><Link href="/gazette" className="hover:text-primary transition-colors" data-testid="link-footer-gazette">جريدة أم القرى</Link></li>
+                <li><Link href="/regulations" className="hover:text-primary transition-colors" data-testid="link-footer-regulations">اللوائح التنفيذية</Link></li>
               </ul>
             </div>
             

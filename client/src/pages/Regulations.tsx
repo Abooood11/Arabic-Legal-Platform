@@ -51,11 +51,11 @@ export default function Regulations() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+        return "bg-primary/10 text-primary border-primary/20";
       case "amended":
-        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+        return "bg-accent/10 text-accent-foreground border-accent/20";
       case "cancelled":
-        return "bg-red-500/10 text-red-600 border-red-500/20";
+        return "bg-destructive/10 text-destructive border-destructive/20";
       default:
         return "bg-muted text-muted-foreground";
     }

@@ -67,7 +67,7 @@ export default function Library() {
     <div className="container mx-auto px-4 py-8 min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary mb-2">المكتبة القانونية</h1>
+          <h1 className="text-3xl font-bold text-primary mb-2">الأنظمة واللوائح</h1>
           <p className="text-muted-foreground">
             {filteredLibrary ? `${filteredLibrary.length} وثيقة` : "جارٍ التحميل..."}
             {library && filteredLibrary && filteredLibrary.length !== library.length &&
@@ -110,10 +110,10 @@ export default function Library() {
             <button
               key={src.value}
               onClick={() => handleFilterChange(setSourceFilter, src.value)}
-              className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 sourceFilter === src.value
-                  ? "bg-blue-600 text-white"
-                  : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300"
+                  ? "bg-primary/80 text-primary-foreground"
+                  : "bg-primary/5 text-primary hover:bg-primary/10"
               }`}
             >
               {src.label}

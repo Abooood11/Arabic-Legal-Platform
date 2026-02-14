@@ -57,9 +57,9 @@ interface Judgment {
 }
 
 const TOKEN_STYLES: Record<string, string> = {
-    amount:  "bg-green-100/70 text-green-800 border-b border-green-300",
-    article: "bg-blue-100/70 text-blue-800 border-b border-blue-300",
-    date:    "bg-orange-100/70 text-orange-800 border-b border-orange-300",
+    amount:  "bg-green-100/70 text-green-800 border-b border-green-400",
+    article: "bg-blue-100/70 text-blue-800 border-b border-blue-400",
+    date:    "bg-orange-100/70 text-orange-800 border-b border-orange-400",
 };
 
 /**
@@ -74,20 +74,20 @@ const SECTION_DIVIDERS: { patterns: RegExp[]; label: string; color: string; bg: 
         // Format B: (الوقائع)  |  Format A: الوقائع:  |  BOG: standalone الوقائع
         patterns: [/\(الوقائع\)/, /الوقائع\s*:/, /^\s*الوقائع\s*$/m],
         label: "الوقائع",
-        color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200",
+        color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-300",
     },
     {
         // Format B: (الأسباب)  |  Format A: الأسباب:  |  BOG: standalone الأسباب (after ### stripped)
         patterns: [/\(الأسباب\)/, /الأسباب\s*:/, /^\s*الأسباب\s*$/m, /الأسباب\s+(?=لما كان)/],
         label: "الأسباب",
-        color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-200",
+        color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-300",
     },
     {
         // Format B: (منطوق الحكم)  |  Format A: نص الحكم:  |  BOG: لذلك حكمت | فلهذه الأسباب حكمت
         // keepMatchInText: the matched phrase (لذلك حكمت) stays in the text after the divider
         patterns: [/\(منطوق الحكم\)/, /نص الحكم\s*:/, /(?:لذلك|فلهذه الأسباب)\s+حكمت/],
         label: "منطوق الحكم",
-        color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200",
+        color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-300",
         keepMatchInText: true,
     },
     {
@@ -95,7 +95,7 @@ const SECTION_DIVIDERS: { patterns: RegExp[]; label: string; color: string; bg: 
         // Appears after the خاتمة as the appellate court's final ruling
         patterns: [/حكمت (?:المحكمة|الهيئة|الدائرة) بتأييد/],
         label: "حكم الاستئناف",
-        color: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-200",
+        color: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-300",
         keepMatchInText: true,
     },
 ];
@@ -311,7 +311,7 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
                         <div key={i} className="mt-10 mb-5 flex items-center gap-4">
                             <div className={`h-px flex-1 border-t ${seg.config.border}`} />
                             <div className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold ${seg.config.color} ${seg.config.bg} border ${seg.config.border} shadow-sm`}>
-                                <span className={`w-2 h-2 rounded-full ${seg.config.bg.replace('50', '400').replace('bg-', 'bg-')}`} style={{ backgroundColor: seg.config.color === 'text-amber-700' ? '#d97706' : seg.config.color === 'text-purple-700' ? '#7e22ce' : '#be123c' }} />
+                                <span className="w-2 h-2 rounded-full bg-current" />
                                 {seg.config.label}
                             </div>
                             <div className={`h-px flex-1 border-t ${seg.config.border}`} />
@@ -377,15 +377,15 @@ function BogMetadataPanel({ meta }: { meta: BogMetadata }) {
             {/* Legal Principles */}
             {meta.principles.length > 0 && (
                 <div className="rounded-2xl bg-background border shadow-sm p-5">
-                    <div className="flex items-center gap-2 mb-3 text-sm font-bold text-emerald-700">
+                    <div className="flex items-center gap-2 mb-3 text-sm font-bold text-primary">
                         <Scale className="h-4 w-4" />
                         <span>المبادئ المستخلصة</span>
                     </div>
                     <div className="space-y-2">
                         {meta.principles.map((principle, i) => (
-                            <div key={i} className="flex gap-3 px-4 py-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
-                                <span className="text-emerald-600 font-bold text-sm mt-0.5 shrink-0">{'أبجدهوزحطيكلمنسعفصقرشتثخذضظغ'[i] || String(i + 1)}.</span>
-                                <span className="text-sm leading-relaxed text-slate-700">{principle}</span>
+                            <div key={i} className="flex gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/10">
+                                <span className="text-primary font-bold text-sm mt-0.5 shrink-0">{'أبجدهوزحطيكلمنسعفصقرشتثخذضظغ'[i] || String(i + 1)}.</span>
+                                <span className="text-sm leading-relaxed text-foreground">{principle}</span>
                             </div>
                         ))}
                     </div>
@@ -395,14 +395,14 @@ function BogMetadataPanel({ meta }: { meta: BogMetadata }) {
             {/* Legal Basis */}
             {meta.legalBasis.length > 0 && (
                 <div className="rounded-2xl bg-background border shadow-sm p-5">
-                    <div className="flex items-center gap-2 mb-3 text-sm font-bold text-blue-700">
+                    <div className="flex items-center gap-2 mb-3 text-sm font-bold text-primary">
                         <BookOpen className="h-4 w-4" />
                         <span>مستند الحكم</span>
                     </div>
                     <ul className="space-y-1.5">
                         {meta.legalBasis.map((basis, i) => (
-                            <li key={i} className="flex gap-2 text-sm text-slate-700 leading-relaxed">
-                                <span className="text-blue-400 mt-1 shrink-0">•</span>
+                            <li key={i} className="flex gap-2 text-sm text-foreground leading-relaxed">
+                                <span className="text-primary mt-1 shrink-0">•</span>
                                 <span>{basis}</span>
                             </li>
                         ))}
@@ -425,7 +425,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
         <Tooltip>
             <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={copy}>
-                    {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
             </TooltipTrigger>
             <TooltipContent>{label || "نسخ"}</TooltipContent>
@@ -606,18 +606,18 @@ export default function JudgmentDetail() {
             <div className="container mx-auto px-4 py-6 max-w-4xl">
                 {/* Header */}
                 <div className={`mb-5 p-5 rounded-2xl bg-background border shadow-sm border-r-4 ${
-                    isEgyptian ? "border-r-amber-400" : "border-r-emerald-400"
+                    isEgyptian ? "border-r-accent" : "border-r-primary"
                 }`}>
                     <div className="flex items-start justify-between gap-3 mb-3">
                         <h1 className="text-lg font-bold text-foreground leading-snug">
                             {displayCourtName}
                         </h1>
                         {isEgyptian ? (
-                            <Badge variant="outline" className="border-amber-200 text-amber-700 bg-amber-50 text-[10px] gap-1 shrink-0">
+                            <Badge variant="outline" className="border-accent/30 text-accent-foreground bg-accent/10 text-[10px] gap-1 shrink-0">
                                 <Scale className="h-3 w-3" /> مصر
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 text-[10px] gap-1 shrink-0">
+                            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5 text-[10px] gap-1 shrink-0">
                                 <Landmark className="h-3 w-3" /> السعودية
                             </Badge>
                         )}
@@ -654,7 +654,7 @@ export default function JudgmentDetail() {
                 {/* Judges Panel - Saudi only */}
                 {judges && judges.length > 0 && (
                     <div className="mt-4 rounded-2xl bg-background border shadow-sm p-5">
-                        <div className="flex items-center gap-2 mb-4 text-sm font-bold text-slate-600">
+                        <div className="flex items-center gap-2 mb-4 text-sm font-bold text-muted-foreground">
                             <Gavel className="h-4 w-4" />
                             <span>هيئة الحكم</span>
                         </div>
@@ -662,13 +662,13 @@ export default function JudgmentDetail() {
                             {/* Show panel head first */}
                             {judges.filter(j => j.role === "رئيس الدائرة").map((judge, i) => (
                                 <Link key={`head-${i}`} href={`/judgments?judge=${encodeURIComponent(judge.name)}`}>
-                                    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 hover:shadow-sm transition-all cursor-pointer group">
-                                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                                            <UserRound className="h-4 w-4 text-emerald-700" />
+                                    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 hover:shadow-sm transition-all cursor-pointer group">
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                            <UserRound className="h-4 w-4 text-primary" />
                                         </div>
                                         <div>
-                                            <div className="text-[10px] text-emerald-600 font-medium">{judge.role}</div>
-                                            <div className="text-sm font-bold text-emerald-800">{judge.name}</div>
+                                            <div className="text-[10px] text-primary/70 font-medium">{judge.role}</div>
+                                            <div className="text-sm font-bold text-primary">{judge.name}</div>
                                         </div>
                                     </div>
                                 </Link>
@@ -676,13 +676,13 @@ export default function JudgmentDetail() {
                             {/* Then show members */}
                             {judges.filter(j => j.role === "عضو").map((judge, i) => (
                                 <Link key={`member-${i}`} href={`/judgments?judge=${encodeURIComponent(judge.name)}`}>
-                                    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:shadow-sm transition-all cursor-pointer group">
-                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-slate-200 transition-colors">
-                                            <UserRound className="h-4 w-4 text-slate-600" />
+                                    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-muted border border-border hover:bg-muted/80 hover:shadow-sm transition-all cursor-pointer group">
+                                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/70 transition-colors">
+                                            <UserRound className="h-4 w-4 text-muted-foreground" />
                                         </div>
                                         <div>
-                                            <div className="text-[10px] text-slate-500 font-medium">{judge.role}</div>
-                                            <div className="text-sm font-bold text-slate-700">{judge.name}</div>
+                                            <div className="text-[10px] text-muted-foreground font-medium">{judge.role}</div>
+                                            <div className="text-sm font-bold text-foreground">{judge.name}</div>
                                         </div>
                                     </div>
                                 </Link>

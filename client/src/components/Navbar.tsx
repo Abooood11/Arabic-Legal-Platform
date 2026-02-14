@@ -11,10 +11,9 @@ export function Navbar() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
 
   const links = [
-    { href: "/library", label: "المكتبة", icon: BookOpen },
-    { href: "/regulations", label: "اللوائح التنفيذية", icon: FileText },
+    { href: "/library", label: "الأنظمة واللوائح", icon: BookOpen },
     { href: "/judgments", label: "الأحكام القضائية", icon: Scale },
-    { href: "/gazette", label: "كشاف أم القرى", icon: Newspaper },
+    { href: "/gazette", label: "كشاف جريدة أم القرى", icon: Newspaper },
     { href: "/about", label: "عن المنصة", icon: Info },
   ];
 
@@ -38,9 +37,9 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${location === link.href ? "text-primary" : "text-muted-foreground"}`}
+              className={`flex items-center gap-2 text-base font-medium transition-colors hover:text-primary ${location === link.href ? "text-primary" : "text-muted-foreground"}`}
             >
-              <link.icon className="w-4 h-4" />
+              <link.icon className="w-5 h-5" />
               {link.label}
             </Link>
           ))}

@@ -91,16 +91,16 @@ function HighlightedSnippet({ text }: { text: string }) {
     );
 }
 
-/** Color for category badge */
+/** Color for category badge - unified theme colors */
 function categoryColor(cat: string | null): string {
-    if (!cat) return "bg-gray-100 text-gray-700 border-gray-300";
-    if (cat.includes("مرسوم ملكي")) return "bg-purple-50 text-purple-700 border-purple-300";
-    if (cat.includes("قرار مجلس الوزراء")) return "bg-blue-50 text-blue-700 border-blue-300";
-    if (cat.includes("أمر ملكي")) return "bg-amber-50 text-amber-700 border-amber-300";
-    if (cat.includes("أمر سامي")) return "bg-rose-50 text-rose-700 border-rose-300";
-    if (cat.includes("قرار وزاري")) return "bg-teal-50 text-teal-700 border-teal-300";
-    if (cat.includes("لائحة")) return "bg-indigo-50 text-indigo-700 border-indigo-300";
-    return "bg-slate-50 text-slate-700 border-slate-300";
+    if (!cat) return "bg-muted text-muted-foreground border-border";
+    if (cat.includes("مرسوم ملكي")) return "bg-primary/5 text-primary border-primary/20";
+    if (cat.includes("قرار مجلس الوزراء")) return "bg-primary/10 text-primary border-primary/30";
+    if (cat.includes("أمر ملكي")) return "bg-accent/10 text-accent-foreground border-accent/30";
+    if (cat.includes("أمر سامي")) return "bg-secondary text-secondary-foreground border-border";
+    if (cat.includes("قرار وزاري")) return "bg-primary/5 text-primary border-primary/15";
+    if (cat.includes("لائحة")) return "bg-muted text-foreground border-border";
+    return "bg-muted text-muted-foreground border-border";
 }
 
 export default function GazetteIndex() {
