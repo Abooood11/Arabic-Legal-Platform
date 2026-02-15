@@ -52,6 +52,7 @@ interface Judgment {
     judgmentNumber: string;
     judgmentDate: string;
     text: string;
+    principleText?: string | null;
     source?: string;
     appealType?: string;
 }
@@ -503,13 +504,14 @@ export default function JudgmentDetail() {
 
     const searchCount = useMemo(() => {
         if (!searchTerm || searchTerm.length < 2 || !judgment?.text) return 0;
-        const lower = judgment.text.toLowerCase();
+        const fullText = (judgment.principleText || "") + "\n" + judgment.text;
+        const lower = fullText.toLowerCase();
         const searchLower = searchTerm.toLowerCase();
         let count = 0;
         let idx = 0;
         while ((idx = lower.indexOf(searchLower, idx)) !== -1) { count++; idx++; }
         return count;
-    }, [searchTerm, judgment?.text]);
+    }, [searchTerm, judgment?.text, judgment?.principleText]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -531,8 +533,12 @@ export default function JudgmentDetail() {
 
     const wordCount = useMemo(() => {
         if (!judgment?.text) return 0;
-        return judgment.text.split(/\s+/).filter(Boolean).length;
-    }, [judgment?.text]);
+        let total = judgment.text.split(/\s+/).filter(Boolean).length;
+        if (judgment.principleText) {
+            total += judgment.principleText.split(/\s+/).filter(Boolean).length;
+        }
+        return total;
+    }, [judgment?.text, judgment?.principleText]);
 
     const judges = useMemo(() => {
         if (!judgment?.text) return null;
@@ -623,7 +629,7 @@ export default function JudgmentDetail() {
                                 <TooltipContent>بحث (Ctrl+F)</TooltipContent>
                             </Tooltip>
                         )}
-                        <CopyButton text={judgment.text} label="نسخ النص الكامل" />
+                        <CopyButton text={judgment.principleText ? `المبدأ القضائي:\n${judgment.principleText}\n\nنص الحكم:\n${judgment.text}` : judgment.text} label="نسخ النص الكامل" />
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigator.clipboard.writeText(window.location.href)}>
@@ -684,8 +690,33 @@ export default function JudgmentDetail() {
                     <BogMetadataPanel meta={bogMeta} />
                 )}
 
+                {/* Egyptian Principle Text - separate section */}
+                {isEgyptian && judgment.principleText && (
+                    <div className="rounded-2xl bg-background border shadow-sm mb-5 overflow-hidden">
+                        <div className="bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-800 px-6 py-3 flex items-center gap-2">
+                            <Scale className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                            <h2 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">المبدأ القضائي</h2>
+                        </div>
+                        <div className="p-6 sm:p-8">
+                            <div className="judgment-text leading-[1.75] whitespace-pre-line text-justify" dir="rtl">
+                                <HighlightedChunk
+                                    text={formatJudgmentText(judgment.principleText)}
+                                    tokens={findHighlightableTokens(formatJudgmentText(judgment.principleText))}
+                                    searchTerm={searchTerm}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Judgment Text */}
                 <div className="rounded-2xl bg-background border shadow-sm p-6 sm:p-8">
+                    {isEgyptian && judgment.principleText && (
+                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
+                            <Gavel className="h-4 w-4 text-amber-700" />
+                            <h2 className="text-sm font-bold text-amber-800 dark:text-amber-300">نص الحكم</h2>
+                        </div>
+                    )}
                     <JudgmentTextBody
                         text={bogMeta?.bodyText || judgment.text}
                         searchTerm={searchTerm}

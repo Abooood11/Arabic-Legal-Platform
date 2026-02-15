@@ -7,13 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HighlightedSnippet } from "@/components/search/HighlightedSnippet";
 import { useDebounce } from "@/hooks/use-debounce";
-import { useSearchHistory } from "@/hooks/use-search-history";
 import {
-  Search, X, BookOpen, Scale, Newspaper, Clock, ArrowLeft,
-  Sparkles, MapPin, Calendar, Hash, Filter, Loader2, Zap,
-  ChevronDown, ChevronUp, HelpCircle, Database, TrendingUp,
-  Quote, Minus, SlidersHorizontal, BarChart3, FileText, ArrowRight,
-  Building2, Gavel, Tag
+  Search, X, BookOpen, Scale, Newspaper, ArrowLeft,
+  Sparkles, MapPin, Calendar, Filter, Zap,
+  ChevronDown, ChevronUp, Quote, Minus, BarChart3, FileText, ArrowRight,
+  Tag, TrendingUp
 } from "lucide-react";
 
 // Types
@@ -129,16 +127,6 @@ const TABS: { key: TabKey; label: string; shortLabel: string; icon: React.ReactN
   { key: "tameems", label: "تعاميم وزارة العدل", shortLabel: "التعاميم", icon: <FileText className="h-4 w-4" /> },
 ];
 
-// Search tips for the help tooltip
-const SEARCH_TIPS = [
-  { syntax: '"عبارة دقيقة"', description: 'البحث بعبارة مطابقة تماماً' },
-  { syntax: '-كلمة', description: 'استبعاد كلمة من النتائج' },
-  { syntax: 'محكمة:الرياض', description: 'تصفية حسب المحكمة' },
-  { syntax: 'مادة:55', description: 'البحث عن رقم مادة محدد' },
-  { syntax: 'سنة:1445', description: 'تصفية حسب السنة' },
-  { syntax: '«عبارة بالعربي»', description: 'بحث دقيق بعلامات اقتباس عربية' },
-];
-
 export default function UnifiedSearch() {
   const [location, setLocation] = useLocation();
 
@@ -151,12 +139,10 @@ export default function UnifiedSearch() {
   const [inputValue, setInputValue] = useState(initialQ);
   const [activeTab, setActiveTab] = useState<TabKey>(initialType);
   const [page, setPage] = useState(initialPage);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showAdvancedHelp, setShowAdvancedHelp] = useState(false);
   const [showFacets, setShowFacets] = useState(false);
   const [exactSearch, setExactSearch] = useState(false);
+  const [saudiOnly, setSaudiOnly] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { recentSearches, addSearch, removeSearch, clearHistory } = useSearchHistory();
 
   const debouncedQuery = useDebounce(inputValue, 400);
 
@@ -171,24 +157,18 @@ export default function UnifiedSearch() {
     }
   }, [debouncedQuery, activeTab, page]);
 
-  // Save search to history
-  useEffect(() => {
-    if (debouncedQuery && debouncedQuery.length >= 2) {
-      addSearch(debouncedQuery);
-    }
-  }, [debouncedQuery, addSearch]);
-
   // Main search query
   const { data, isLoading, isFetching } = useQuery<SearchResult>({
-    queryKey: ["unified-search", debouncedQuery, activeTab, page, exactSearch],
+    queryKey: ["unified-search", debouncedQuery, activeTab, page, exactSearch, saudiOnly],
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
         q: debouncedQuery,
         type: activeTab,
         page: page.toString(),
-        limit: activeTab === "all" ? "5" : "15",
+        limit: activeTab === "all" ? "10" : "15",
       });
       if (exactSearch) params.set("exact", "true");
+      if (saudiOnly) params.set("saudi_only", "true");
       const res = await fetch(`/api/search?${params}`, { signal });
       if (!res.ok) throw new Error("Search failed");
       return res.json();
@@ -198,7 +178,7 @@ export default function UnifiedSearch() {
     placeholderData: (prev) => prev,
   });
 
-  // Search stats
+  // Search stats for document count
   const { data: stats } = useQuery<SearchStats>({
     queryKey: ["search-stats"],
     queryFn: async () => {
@@ -215,24 +195,12 @@ export default function UnifiedSearch() {
       const res = await fetch("/api/search/trending");
       return res.json();
     },
-    staleTime: 300000, // 5 minutes
-  });
-
-  // Suggestions query
-  const { data: suggestions } = useQuery<{ text: string; type: string }[]>({
-    queryKey: ["search-suggest", inputValue],
-    queryFn: async () => {
-      const res = await fetch(`/api/search/suggest?q=${encodeURIComponent(inputValue)}`);
-      return res.json();
-    },
-    enabled: inputValue.length >= 1 && showSuggestions && !debouncedQuery,
-    staleTime: 60000,
+    staleTime: 300000,
   });
 
   const handleSearch = useCallback((query: string) => {
     setInputValue(query);
     setPage(1);
-    setShowSuggestions(false);
     inputRef.current?.blur();
   }, []);
 
@@ -257,7 +225,6 @@ export default function UnifiedSearch() {
     tameems: data.results.tameems?.total || 0,
   } : { all: 0, laws: 0, judgments: 0, gazette: 0, tameems: 0 };
 
-  const hasResults = data && data.totalResults > 0;
   const isSearchActive = debouncedQuery.length >= 2;
 
   // Auto-focus search input
@@ -273,10 +240,6 @@ export default function UnifiedSearch() {
         inputRef.current?.focus();
         inputRef.current?.select();
       }
-      if (e.key === "Escape") {
-        setShowSuggestions(false);
-        setShowAdvancedHelp(false);
-      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -290,7 +253,7 @@ export default function UnifiedSearch() {
           <div className="max-w-3xl mx-auto text-center mb-6">
             <h1 className="text-3xl font-bold text-primary mb-2">البحث العميق</h1>
             <p className="text-muted-foreground text-sm">
-              ابحث في الأنظمة والأحكام القضائية وكشاف أم القرى من مكان واحد
+              ابحث في {stats ? `${Math.floor(stats.totalDocuments / 1000)} ألف` : "أكثر من 100 ألف"} وثيقة نظامية من مكان واحد
             </p>
           </div>
 
@@ -302,19 +265,10 @@ export default function UnifiedSearch() {
               </div>
               <Input
                 ref={inputRef}
-                placeholder='ابحث عن نظام، مادة قانونية، حكم قضائي... (استخدم "عبارة" للبحث الدقيق)'
+                placeholder='ابحث عن نظام، مادة قانونية، حكم قضائي...'
                 className="pr-12 pl-12 h-14 text-base sm:text-lg rounded-2xl shadow-md border-2 focus:border-primary/50 transition-all"
                 value={inputValue}
-                onChange={(e) => {
-                  setInputValue(e.target.value);
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setShowSuggestions(false);
-                  }
-                }}
+                onChange={(e) => setInputValue(e.target.value)}
               />
               <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                 {inputValue && (
@@ -333,130 +287,36 @@ export default function UnifiedSearch() {
               </div>
             </div>
 
-            {/* Exact Search Toggle + Help */}
-            <div className="flex items-center gap-3 mt-3 flex-wrap">
+            {/* Search Filter Tabs + Exact Toggle */}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => handleTabChange(tab.key)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      activeTab === tab.key
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab.icon}
+                    <span className="hidden sm:inline">{tab.shortLabel}</span>
+                  </button>
+                ))}
+              </div>
               <Button
                 variant={exactSearch ? "default" : "outline"}
                 size="sm"
-                className="gap-1.5 text-xs"
+                className="gap-1.5 text-xs h-8"
                 onClick={() => { setExactSearch(!exactSearch); setPage(1); }}
               >
-                {exactSearch ? "✓ بحث حرفي" : "بحث حرفي"}
+                بحث حرفي
               </Button>
-              <button
-                onClick={() => setShowAdvancedHelp(!showAdvancedHelp)}
-                className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors ${showAdvancedHelp ? "text-primary bg-primary/10" : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted"}`}
-                title="نصائح البحث المتقدم"
-              >
-                <HelpCircle className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">نصائح البحث</span>
-              </button>
-              {!exactSearch && inputValue && (
-                <span className="text-xs text-muted-foreground">
-                  💡 البحث يتوسع تلقائياً ليشمل المرادفات القانونية
-                </span>
-              )}
-              {exactSearch && (
-                <span className="text-xs text-primary font-medium">
-                  البحث الحرفي: النتائج مطابقة تماماً لما كتبته
-                </span>
-              )}
             </div>
-
-            {/* Advanced Search Help Panel */}
-            {showAdvancedHelp && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-xl shadow-xl z-50 p-4 max-h-[70vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-sm text-primary flex items-center gap-2">
-                    <SlidersHorizontal className="h-4 w-4" />
-                    البحث المتقدم
-                  </h3>
-                  <button onClick={() => setShowAdvancedHelp(false)} className="text-muted-foreground hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {SEARCH_TIPS.map((tip, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        appendFilter(tip.syntax);
-                        setShowAdvancedHelp(false);
-                      }}
-                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 text-right transition-colors"
-                    >
-                      <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono shrink-0 text-primary">{tip.syntax}</code>
-                      <span className="text-xs text-muted-foreground">{tip.description}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
-                  <p>💡 يمكنك دمج عدة عوامل: <code className="bg-muted px-1 rounded">"نظام العمل" مادة:55 -ملغاة</code></p>
-                </div>
-              </div>
-            )}
-
-            {/* Suggestions Dropdown */}
-            {showSuggestions && !isSearchActive && !showAdvancedHelp && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-xl shadow-xl z-50 overflow-hidden max-h-[70vh] overflow-y-auto">
-                {/* Recent Searches */}
-                {recentSearches.length > 0 && (
-                  <div className="p-3 border-b">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-muted-foreground">عمليات بحث سابقة</span>
-                      <button onClick={clearHistory} className="text-xs text-primary hover:underline">مسح</button>
-                    </div>
-                    {recentSearches.slice(0, 5).map((search, i) => (
-                      <div key={i} className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 text-sm">
-                        <button
-                          onClick={() => handleSearch(search)}
-                          className="flex items-center gap-2 flex-1 min-w-0 text-right"
-                        >
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="flex-1 truncate">{search}</span>
-                        </button>
-                        <button
-                          onClick={() => removeSearch(search)}
-                          className="text-muted-foreground/50 hover:text-destructive shrink-0"
-                          aria-label={`حذف البحث ${search}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* API Suggestions */}
-                {suggestions && suggestions.length > 0 && (
-                  <div className="p-3">
-                    <span className="text-xs font-medium text-muted-foreground mb-2 block">اقتراحات</span>
-                    {suggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSearch(s.text)}
-                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 text-sm text-right"
-                      >
-                        {s.type === "law" && <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />}
-                        {s.type === "court" && <Scale className="h-3.5 w-3.5 text-primary shrink-0" />}
-                        {s.type === "gazette_category" && <Newspaper className="h-3.5 w-3.5 text-primary shrink-0" />}
-                        <span className="flex-1 truncate">{s.text}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Empty state */}
-                {recentSearches.length === 0 && (!suggestions || suggestions.length === 0) && (
-                  <div className="p-6 text-center text-muted-foreground text-sm">
-                    ابدأ بكتابة كلمة للبحث
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
-          {/* Search Stats & Advanced Indicators */}
+          {/* Search Stats */}
           {isSearchActive && data && (
             <div className="max-w-3xl mx-auto mt-4">
               <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground flex-wrap">
@@ -501,53 +361,34 @@ export default function UnifiedSearch() {
         </div>
       </div>
 
-      {/* Click outside to close dropdowns */}
-      {(showSuggestions || showAdvancedHelp) && (
-        <div className="fixed inset-0 z-40" onClick={() => { setShowSuggestions(false); setShowAdvancedHelp(false); }} />
-      )}
-
       {/* Content Area */}
       <div className="container mx-auto px-4 py-6">
         {isSearchActive ? (
           <>
-            {/* Tabs + Facet Toggle */}
-            <div className="border-b bg-background sticky top-20 z-20 mb-6 -mx-4 px-4">
-              <div className="flex items-center gap-1.5 py-2 overflow-x-auto max-w-4xl mx-auto scrollbar-thin">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => handleTabChange(tab.key)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border ${
-                      activeTab === tab.key
-                        ? "bg-primary text-primary-foreground shadow-md border-primary"
-                        : "text-muted-foreground hover:text-primary hover:bg-primary/5 border-transparent"
-                    }`}
-                  >
-                    {tab.icon}
-                    <span className="hidden sm:inline">{tab.label}</span>
-                    <span className="sm:hidden">{tab.shortLabel}</span>
-                    {isSearchActive && tabCounts[tab.key] > 0 && (
-                      <Badge variant={activeTab === tab.key ? "secondary" : "outline"} className="text-[10px] h-5 px-1.5 mr-1">
-                        {tabCounts[tab.key].toLocaleString("en")}
-                      </Badge>
-                    )}
-                  </button>
-                ))}
-
-                {/* Facets toggle button */}
-                {data && (data.facets.years.length > 0 || data.facets.cities.length > 0 || data.facets.categories.length > 0) && (
-                  <button
-                    onClick={() => setShowFacets(!showFacets)}
-                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ms-auto shrink-0 ${
-                      showFacets ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary"
-                    }`}
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    <span className="hidden sm:inline">تحليل النتائج</span>
-                    {showFacets ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </button>
+            {/* Results count bar with facet toggle */}
+            <div className="mb-6 max-w-4xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {activeTab !== "all" && (
+                  <Badge variant="secondary" className="text-xs">
+                    {TABS.find(t => t.key === activeTab)?.shortLabel}
+                  </Badge>
+                )}
+                {tabCounts[activeTab] > 0 && (
+                  <span>{tabCounts[activeTab].toLocaleString("en")} نتيجة</span>
                 )}
               </div>
+              {data && (data.facets.years.length > 0 || data.facets.cities.length > 0 || data.facets.categories.length > 0) && (
+                <button
+                  onClick={() => setShowFacets(!showFacets)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    showFacets ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-muted"
+                  }`}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  تصفية
+                  {showFacets ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
             </div>
 
             {/* Results Layout */}
@@ -565,7 +406,7 @@ export default function UnifiedSearch() {
                     ))}
                   </div>
                 ) : activeTab === "all" ? (
-                  <AllResultsView data={data!} onTabChange={handleTabChange} />
+                  <AllResultsView data={data!} />
                 ) : activeTab === "laws" ? (
                   <LawResultsView items={data?.results.laws.items || []} total={data?.results.laws.total || 0} page={page} onPageChange={setPage} query={debouncedQuery} />
                 ) : activeTab === "judgments" ? (
@@ -581,16 +422,7 @@ export default function UnifiedSearch() {
                   <div className="py-16 text-center">
                     <Filter className="w-16 h-16 mx-auto mb-4 text-muted-foreground/20" />
                     <p className="text-lg text-muted-foreground mb-2">لا توجد نتائج لـ "{debouncedQuery}"</p>
-                    <p className="text-sm text-muted-foreground mb-4">جرّب كلمات بحث مختلفة أو أقل تحديداً</p>
-                    <div className="flex items-center justify-center gap-2 flex-wrap">
-                      <span className="text-xs text-muted-foreground">💡 نصائح:</span>
-                      <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted" onClick={() => setShowAdvancedHelp(true)}>
-                        استخدم البحث المتقدم
-                      </Badge>
-                      <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted" onClick={() => { setInputValue(debouncedQuery.split(/\s+/).slice(0, 2).join(" ")); }}>
-                        قلّل كلمات البحث
-                      </Badge>
-                    </div>
+                    <p className="text-sm text-muted-foreground">جرّب كلمات بحث مختلفة أو أقل تحديداً</p>
                   </div>
                 )}
               </div>
@@ -617,28 +449,22 @@ export default function UnifiedSearch() {
 
             {/* Suggested legal topics */}
             {trending && trending.length > 0 && (
-              <div className="mb-6">
-                <p className="text-xs text-muted-foreground mb-3 flex items-center justify-center gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                  موضوعات شائعة
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {trending.slice(0, 8).map((t, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSearch(t.query)}
-                      className="px-3 py-1.5 rounded-full text-sm bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors border border-primary/10 flex items-center gap-1.5"
-                    >
-                      <span>{t.query}</span>
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {trending.slice(0, 8).map((t, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSearch(t.query)}
+                    className="px-3 py-1.5 rounded-full text-sm bg-primary/5 hover:bg-primary/15 hover:text-primary transition-colors border border-primary/10"
+                  >
+                    {t.query}
+                  </button>
+                ))}
               </div>
             )}
 
             {/* Quick search examples (fallback if no trending data yet) */}
             {(!trending || trending.length === 0) && (
-              <div className="flex flex-wrap justify-center gap-2 mb-8">
+              <div className="flex flex-wrap justify-center gap-2">
                 {["نظام العمل", "نظام المعاملات المدنية", "إيجار", "تحكيم تجاري", "ضريبة القيمة المضافة"].map((example) => (
                   <button
                     key={example}
@@ -650,31 +476,6 @@ export default function UnifiedSearch() {
                 ))}
               </div>
             )}
-
-            {/* Advanced search tools - always visible */}
-            <div className="max-w-2xl mx-auto">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <SlidersHorizontal className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">أدوات البحث المتقدم</span>
-              </div>
-              <div className="bg-muted/30 rounded-xl p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {SEARCH_TIPS.map((tip, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setInputValue(tip.syntax);
-                        inputRef.current?.focus();
-                      }}
-                      className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-background/80 border border-transparent hover:border-primary/20 text-right transition-all"
-                    >
-                      <code className="text-xs bg-background px-2 py-1 rounded font-mono shrink-0 text-primary font-bold shadow-sm">{tip.syntax}</code>
-                      <span className="text-xs text-muted-foreground">{tip.description}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -796,65 +597,48 @@ function FacetsSidebar({
 // Sub-components
 // ============================================
 
-function AllResultsView({ data, onTabChange }: { data: SearchResult; onTabChange: (tab: TabKey) => void }) {
-  const sections: { key: TabKey; label: string; icon: React.ReactNode; items: any[]; total: number }[] = [];
+// Unified result item for merging all types
+interface UnifiedItem {
+  type: "law" | "judgment" | "gazette" | "tameem";
+  rank: number;
+  data: any;
+}
 
-  // Order sections by intent priority
-  const priority = data.intent?.priority || ["laws", "judgments", "gazette"];
+function AllResultsView({ data }: { data: SearchResult }) {
+  // Merge all results into one list sorted by rank (lower = more relevant in bm25)
+  const merged = useMemo(() => {
+    const items: UnifiedItem[] = [];
 
-  for (const p of priority) {
-    if (p === "laws" && data.results.laws.total > 0) {
-      sections.push({ key: "laws", label: "الأنظمة واللوائح", icon: <BookOpen className="h-5 w-5" />, items: data.results.laws.items, total: data.results.laws.total });
+    for (const item of data.results.laws.items) {
+      items.push({ type: "law", rank: item.rank, data: item });
     }
-    if (p === "judgments" && data.results.judgments.total > 0) {
-      sections.push({ key: "judgments", label: "الأحكام القضائية", icon: <Scale className="h-5 w-5" />, items: data.results.judgments.items, total: data.results.judgments.total });
+    for (const item of data.results.judgments.items) {
+      items.push({ type: "judgment", rank: item.rank, data: item });
     }
-    if (p === "gazette" && data.results.gazette.total > 0) {
-      sections.push({ key: "gazette", label: "كشاف أم القرى", icon: <Newspaper className="h-5 w-5" />, items: data.results.gazette.items, total: data.results.gazette.total });
+    for (const item of data.results.gazette.items) {
+      items.push({ type: "gazette", rank: item.rank, data: item });
     }
-  }
-  // Always add tameems at end if they have results
-  if (data.results.tameems?.total > 0) {
-    sections.push({ key: "tameems", label: "تعاميم وزارة العدل", icon: <FileText className="h-5 w-5" />, items: data.results.tameems.items, total: data.results.tameems.total });
-  }
+    for (const item of (data.results.tameems?.items || [])) {
+      items.push({ type: "tameem", rank: item.rank, data: item });
+    }
+
+    // bm25 rank: lower (more negative) = better match
+    items.sort((a, b) => a.rank - b.rank);
+
+    return items;
+  }, [data]);
+
+  if (merged.length === 0) return null;
 
   return (
-    <div className="space-y-8">
-      {sections.map((section) => (
-        <div key={section.key}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-primary font-bold">
-              {section.icon}
-              <span>{section.label}</span>
-              <Badge variant="outline" className="text-xs">{section.total.toLocaleString("en")}</Badge>
-            </div>
-            {section.total > 5 && (
-              <button
-                onClick={() => onTabChange(section.key)}
-                className="text-sm text-primary hover:underline flex items-center gap-1"
-              >
-                عرض الكل
-                <ArrowLeft className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            {section.key === "laws" && (section.items as LawResult[]).slice(0, 3).map((item, i) => (
-              <LawResultCard key={i} item={item} query={data.query} index={i} />
-            ))}
-            {section.key === "judgments" && (section.items as JudgmentResult[]).slice(0, 3).map((item, i) => (
-              <JudgmentResultCard key={i} item={item} query={data.query} index={i} />
-            ))}
-            {section.key === "gazette" && (section.items as GazetteResult[]).slice(0, 3).map((item, i) => (
-              <GazetteResultCard key={i} item={item} query={data.query} index={i} />
-            ))}
-            {section.key === "tameems" && (section.items as TameemResult[]).slice(0, 3).map((item, i) => (
-              <TameemResultCard key={i} item={item} query={data.query} index={i} />
-            ))}
-          </div>
-        </div>
-      ))}
+    <div className="space-y-3">
+      {merged.map((item, i) => {
+        if (item.type === "law") return <LawResultCard key={`l-${i}`} item={item.data} query={data.query} index={i} />;
+        if (item.type === "judgment") return <JudgmentResultCard key={`j-${i}`} item={item.data} query={data.query} index={i} />;
+        if (item.type === "gazette") return <GazetteResultCard key={`g-${i}`} item={item.data} query={data.query} index={i} />;
+        if (item.type === "tameem") return <TameemResultCard key={`t-${i}`} item={item.data} query={data.query} index={i} />;
+        return null;
+      })}
     </div>
   );
 }
@@ -960,7 +744,7 @@ function JudgmentResultCard({ item, query, index }: { item: JudgmentResult; quer
             <div className="flex items-center gap-3 text-xs text-muted-foreground mb-1 flex-wrap">
               {item.city && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{item.city}</span>}
               {item.year_hijri && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{item.year_hijri}هـ</span>}
-              {item.case_id && <span className="flex items-center gap-1"><Hash className="h-3 w-3" />{item.case_id}</span>}
+              {item.case_id && <span className="flex items-center gap-1"><FileText className="h-3 w-3" />{item.case_id}</span>}
             </div>
             <div className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
               <HighlightedSnippet text={item.textSnippet} />
@@ -986,7 +770,7 @@ function GazetteResultCard({ item, query, index }: { item: GazetteResult; query?
           <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
             {item.category && <Badge variant="outline" className="text-[10px]">{item.category}</Badge>}
             {item.issue_year && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />عدد {item.issue_year}</span>}
-            {item.legislation_number && <span className="flex items-center gap-1"><Hash className="h-3 w-3" />رقم {item.legislation_number}</span>}
+            {item.legislation_number && <span className="flex items-center gap-1"><FileText className="h-3 w-3" />رقم {item.legislation_number}</span>}
             {item.legislation_year && <span>لعام {item.legislation_year}</span>}
           </div>
         </div>
@@ -1008,9 +792,8 @@ function TameemResultCard({ item, query, index }: { item: TameemResult; query?: 
             <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-700 dark:text-emerald-400">تعميم</Badge>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground mb-1 flex-wrap">
-            {item.tameem_number && <span className="flex items-center gap-1"><Hash className="h-3 w-3" />{item.tameem_number}</span>}
+            {item.tameem_number && <span className="flex items-center gap-1"><FileText className="h-3 w-3" />{item.tameem_number}</span>}
             {item.tameem_date && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{item.tameem_date}</span>}
-            {item.year_hijri && <span>{item.year_hijri}هـ</span>}
           </div>
           <div className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
             <HighlightedSnippet text={item.textSnippet} />
@@ -1024,7 +807,6 @@ function TameemResultCard({ item, query, index }: { item: TameemResult; query?: 
 // Pagination
 
 function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
-  // Generate page numbers
   const pages = useMemo(() => {
     const items: (number | "...")[] = [];
     if (totalPages <= 7) {

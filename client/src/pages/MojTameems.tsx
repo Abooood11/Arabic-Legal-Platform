@@ -9,7 +9,6 @@ import {
   ChevronDown,
   FileText,
   Calendar,
-  Hash,
   X,
   Filter,
   SlidersHorizontal,
@@ -282,7 +281,7 @@ export default function MojTameems() {
                         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                           {item.tameem_number && (
                             <span className="flex items-center gap-1">
-                              <Hash className="h-3 w-3" />
+                              <FileText className="h-3 w-3" />
                               {item.tameem_number}
                             </span>
                           )}
@@ -291,9 +290,6 @@ export default function MojTameems() {
                               <Calendar className="h-3 w-3" />
                               {item.tameem_date}
                             </span>
-                          )}
-                          {item.year_hijri && (
-                            <span>{item.year_hijri}هـ</span>
                           )}
                         </div>
                         {!isExpanded && item.textPreview && (

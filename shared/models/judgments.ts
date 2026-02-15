@@ -13,6 +13,7 @@ export const judgments = sqliteTable(
         judgmentNumber: text("judgment_number"),
         judgmentDate: text("judgment_date"),
         text: text("text").notNull(),
+        principleText: text("principle_text"),
         source: text("source").notNull().default("sa_judicial"),
         appealType: text("appeal_type"),
         judges: text("judges", { mode: "json" }).$type<{ role: string; name: string }[]>(),

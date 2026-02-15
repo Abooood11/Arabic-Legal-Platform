@@ -15,8 +15,8 @@
 
 ### Backend
 - **Node.js** + **Express 5**
-- **Drizzle ORM** للتعامل مع قاعدة البيانات
-- **PostgreSQL** قاعدة البيانات
+- **Drizzle ORM** + **better-sqlite3** (SQLite)
+- **SQLite FTS5** للبحث الكامل (unicode61, remove_diacritics)
 
 ### AI Integration
 - **OpenAI API** لشرح المواد القانونية
@@ -111,27 +111,80 @@ ADMIN_USER_IDS=user_id_1,user_id_2
 - `PATCH /api/error-reports/:id/resolve` - حل تقرير (مشرف)
 - `DELETE /api/error-reports/:id` - حذف تقرير (مشرف)
 
-## 📊 قاعدة البيانات (Drizzle Schema)
+## 📊 قاعدة البيانات (SQLite + Drizzle)
 
-```typescript
-// جدول تعديلات المواد
-articleOverrides: {
-  lawId: string,
-  articleNumber: string,
-  overrideText: string,
-  updatedAt: timestamp,
-  updatedBy: string
-}
+**الملف:** `data.db` (~5.4 جيجابايت) — SQLite مع WAL mode.
 
-// جدول تقارير الأخطاء
-errorReports: {
-  id: serial,
-  lawId: string,
-  articleNumber: integer,
-  description: text,
-  status: string, // 'pending' | 'resolved'
-  createdAt: timestamp,
-  resolvedAt: timestamp
+### الجداول الرئيسية
+
+```
+judgments              — 568,562 حكم قضائي (سعودي + مصري)
+  ├── id, case_id, year_hijri, city, court_body, circuit_type
+  ├── judgment_number, judgment_date, text (NOT NULL)
+  ├── principle_text   — المبدأ القضائي (للأحكام المصرية، 332K سجل)
+  ├── source           — 'sa_judicial' | 'bog_judicial' | 'eg_naqd'
+  ├── appeal_type, judges (JSON)
+  └── indexes: source, source+date, date, court_body, year_hijri, city, case_id
+
+judgments_fts          — FTS5 (text, court_body) — 568,562 سجل
+law_articles           — مواد الأنظمة (law_id, law_name, article_number, article_text)
+law_articles_fts       — FTS5 للبحث في مواد الأنظمة
+gazette_index          — فهرس الجريدة الرسمية (أم القرى)
+gazette_fts            — FTS5 للبحث في الجريدة
+crsd_principles        — 353 مبدأ من لجنة استئناف منازعات الأوراق المالية
+crsd_principles_fts    — FTS5 للبحث في مبادئ CRSD
+search_logs            — سجل عمليات البحث
+search_clicks          — تتبع النقرات على نتائج البحث
+article_overrides      — تعديلات المواد يدوياً (مشرف)
+error_reports          — تقارير الأخطاء
+```
+
+### البيانات المستوردة
+
+| المصدر | العدد | الحقل source | الملاحظات |
+|--------|-------|--------------|-----------|
+| أحكام النقض المصرية (EMJ) | 553,891 | `eg_naqd` | 4 أقسام: مدني، جنائي، دستوري، اقتصادي |
+| ديوان المظالم (BOG) | 6,258 | `bog_judicial` | مجلدات 1441-1446 |
+| القضاء السعودي | 8,413 | `sa_judicial` | من بوابة القضاء |
+| مبادئ CRSD | 353 | جدول منفصل | لجنة الاستئناف في الأوراق المالية |
+
+### أداء قاعدة البيانات
+- **Pragmas:** WAL, 64MB cache, 256MB mmap, temp in RAM
+- **Indexes:** 7 على judgments + indexes لكل جدول
+- **FTS5 tokenizer:** `unicode61 remove_diacritics 2`
+- **Facets cache:** in-memory مع TTL ساعة + pre-warming عند بدء السيرفر
+- **أداء نموذجي:** قائمة 0.24s، facets 0.21s (cached)، حكم واحد 3-13ms
+
+### سكربتات البيانات
+
+| السكربت | الوظيفة |
+|---------|---------|
+| `scripts/import_emj_rulings.ts` | استيراد 562K حكم مصري من `scraper/data/` |
+| `scripts/migrate_principles.ts` | فصل المبدأ القضائي عن نص الحكم (من JSON الأصلية) |
+| `scripts/import_crsd_principles.ts` | استيراد مبادئ CRSD |
+| `scraper/scraper.js` | استخراج أحكام النقض المصرية من EMJ API |
+| `scraper/audit_emj_data.js` | تدقيق جودة بيانات الأحكام المصرية |
+
+### ملفات البيانات الأصلية (scraper/data/)
+
+```
+scraper/data/
+├── civil_cassation/     — 95 ملف (1928-2022) — 266,634 حكم
+├── criminal_cassation/  — 95 ملف (1928-2022) — 287,352 حكم
+├── constitutional/      — 58 ملف (1958-2022) — 7,133 حكم
+└── economic/            — 7 ملف (2009-2015) — 1,185 حكم
+```
+
+كل ملف JSON يحتوي مصفوفة من:
+```json
+{
+  "source_id": "878390",
+  "section_name": "civil_cassation",
+  "case_number": "5921",
+  "case_year": "82",
+  "session_date": "2020-12-28",
+  "principle_text": "المبدأ القضائي...",
+  "facts_text": "نص الحكم الكامل..."
 }
 ```
 
@@ -142,12 +195,13 @@ errorReports: {
 
 ## ⚠️ ملاحظات مهمة
 
-1. **البيانات القانونية** موجودة في `/client/public/data/laws/` كملفات JSON
-2. **التوثيق** يدعم Authentication عبر Replit Auth (يحتاج تعديل لمنصات أخرى)
-3. **الشرح بالذكاء الاصطناعي** يستخدم Server-Sent Events للـ streaming
-4. **النظامان المتوفران حالياً**:
-   - نظام المعاملات المدنية (civil_transactions_sa)
-   - نظام المرافعات الشرعية (sharia_procedures)
+1. **قاعدة البيانات** SQLite (ملف `data.db` ~5.4GB). لا يتم تتبعه في git.
+2. **البيانات القانونية** (الأنظمة) في `/client/public/data/laws/` كملفات JSON
+3. **بيانات الأحكام الأصلية** في `scraper/data/` (562K ملف JSON)
+4. **المصادقة** عبر Google OAuth 2.0 (`server/authSystem.ts`)
+5. **الشرح بالذكاء الاصطناعي** يستخدم Server-Sent Events للـ streaming
+6. **الأحكام المصرية**: `principleText` (المبدأ) منفصل عن `text` (الحكم) — يُعرضان كقسمين في صفحة التفاصيل
+7. **أداء الأحكام**: indexes ضرورية على جدول 568K صف. بدونها COUNT يأخذ timeout
 
 ## 🔄 للنشر على منصات أخرى
 

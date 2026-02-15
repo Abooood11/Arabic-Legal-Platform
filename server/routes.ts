@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { registerAuthRoutes, isAuthenticated, isAdmin, setupAuthSchema } from "./authSystem";
 import { db, sqlite } from "./db";
-import { articleOverrides, errorReports, judgments, gazetteIndex } from "@shared/schema";
+import { articleOverrides, errorReports, judgments, gazetteIndex, crsdPrinciples } from "@shared/schema";
 import { eq, and, desc, sql, like } from "drizzle-orm";
 import { readLatestLegalMonitoringReport, runLegalMonitoringScan } from "./legalMonitoring";
 import { setupAnalyticsSchema, recordAnalyticsEvent } from "./analytics";
@@ -692,12 +692,37 @@ export async function registerRoutes(
     // Table may not exist yet
   }
 
+  // CRSD Principles (المبادئ القضائية) search statements
+  let searchCrsdStmt: any = null;
+  let countCrsdStmt: any = null;
+  try {
+    searchCrsdStmt = sqlite.prepare(`
+      SELECT p.id, p.section, p.section_ar, p.decision_numbers, p.source_ar,
+             snippet(crsd_principles_fts, 0, '【', '】', '...', 40) as textSnippet,
+             bm25(crsd_principles_fts) as rank
+      FROM crsd_principles p
+      INNER JOIN crsd_principles_fts fts ON p.id = fts.rowid
+      WHERE crsd_principles_fts MATCH ?
+      ORDER BY rank
+      LIMIT ? OFFSET ?
+    `);
+    countCrsdStmt = sqlite.prepare(`
+      SELECT count(*) as count
+      FROM crsd_principles p
+      INNER JOIN crsd_principles_fts fts ON p.id = fts.rowid
+      WHERE crsd_principles_fts MATCH ?
+    `);
+  } catch {
+    // Table may not exist yet
+  }
+
   app.get("/api/search", async (req, res) => {
     try {
       const startTime = Date.now();
       const q = (req.query.q as string || "").trim();
       const type = (req.query.type as string) || "all";
       const exact = req.query.exact as string;
+      const saudiOnly = req.query.saudi_only === "true";
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
       const offset = (page - 1) * limit;
@@ -708,7 +733,7 @@ export async function registerRoutes(
           totalResults: 0,
           timeTaken: 0,
           intent: null,
-          results: { laws: { items: [], total: 0 }, judgments: { items: [], total: 0 }, gazette: { items: [], total: 0 }, tameems: { items: [], total: 0 } }
+          results: { laws: { items: [], total: 0 }, judgments: { items: [], total: 0 }, gazette: { items: [], total: 0 }, tameems: { items: [], total: 0 }, principles: { items: [], total: 0 } }
         });
       }
 
@@ -733,6 +758,26 @@ export async function registerRoutes(
       const searchJudgments = () => {
         if (type !== "all" && type !== "judgments") return { items: [], total: 0 };
         try {
+          if (saudiOnly) {
+            // Filter out non-Saudi (Egyptian) judgments
+            const items = sqlite.prepare(`
+              SELECT j.id, j.case_id, j.year_hijri, j.city, j.court_body, j.judgment_date, j.source,
+                     snippet(judgments_fts, 0, '【', '】', '...', 40) as textSnippet,
+                     bm25(judgments_fts) as rank
+              FROM judgments j
+              INNER JOIN judgments_fts fts ON j.id = fts.rowid
+              WHERE judgments_fts MATCH ? AND j.source != 'eg_naqd'
+              ORDER BY rank
+              LIMIT ? OFFSET ?
+            `).all(ftsQuery, limit, offset) as any[];
+            const countResult = sqlite.prepare(`
+              SELECT count(*) as count
+              FROM judgments j
+              INNER JOIN judgments_fts fts ON j.id = fts.rowid
+              WHERE judgments_fts MATCH ? AND j.source != 'eg_naqd'
+            `).get(ftsQuery) as any;
+            return { items, total: countResult?.count || 0 };
+          }
           const items = searchJudgmentsStmt.all(ftsQuery, limit, offset) as any[];
           const countResult = countJudgmentsStmt.get(ftsQuery) as any;
           return { items, total: countResult?.count || 0 };
@@ -758,14 +803,25 @@ export async function registerRoutes(
         } catch { return { items: [], total: 0 }; }
       };
 
+      const searchPrinciples = () => {
+        if (type !== "all" && type !== "principles") return { items: [], total: 0 };
+        if (!searchCrsdStmt) return { items: [], total: 0 };
+        try {
+          const items = searchCrsdStmt.all(ftsQuery, limit, offset) as any[];
+          const countResult = countCrsdStmt.get(ftsQuery) as any;
+          return { items, total: countResult?.count || 0 };
+        } catch { return { items: [], total: 0 }; }
+      };
+
       // Execute all searches (SQLite is sync so they run sequentially, but each is fast with FTS5)
       const lawResults = searchLaws();
       const judgmentResults = searchJudgments();
       const gazetteResults = searchGazette();
       const tameemsResults = searchTameems();
+      const principlesResults = searchPrinciples();
 
       const timeTaken = Date.now() - startTime;
-      const totalResults = lawResults.total + judgmentResults.total + gazetteResults.total + tameemsResults.total;
+      const totalResults = lawResults.total + judgmentResults.total + gazetteResults.total + tameemsResults.total + principlesResults.total;
 
       // Cross-reference: find related content across types
       const crossLinks: { lawsToJudgments: string[]; lawsToGazette: string[]; relatedLaws: string[] } = { lawsToJudgments: [], lawsToGazette: [], relatedLaws: [] };
@@ -858,6 +914,7 @@ export async function registerRoutes(
           judgments: judgmentResults,
           gazette: gazetteResults,
           tameems: tameemsResults,
+          principles: principlesResults,
         }
       });
     } catch (err: any) {
@@ -926,17 +983,20 @@ export async function registerRoutes(
       const lawNamesCount = (sqlite.prepare("SELECT count(DISTINCT law_id) as cnt FROM law_articles").get() as any)?.cnt || 0;
       let tameemsCount = 0;
       try { tameemsCount = (sqlite.prepare("SELECT count(*) as cnt FROM moj_tameems").get() as any)?.cnt || 0; } catch {}
+      let principlesCount = 0;
+      try { principlesCount = (sqlite.prepare("SELECT count(*) as cnt FROM crsd_principles").get() as any)?.cnt || 0; } catch {}
 
       res.set("Cache-Control", "public, max-age=3600");
       res.json({
-        totalDocuments: lawCount + judgmentCount + gazetteCount + tameemsCount,
+        totalDocuments: lawCount + judgmentCount + gazetteCount + tameemsCount + principlesCount,
         laws: { articles: lawCount, laws: lawNamesCount },
         judgments: { total: judgmentCount },
         gazette: { total: gazetteCount },
         tameems: { total: tameemsCount },
+        principles: { total: principlesCount },
       });
     } catch {
-      res.json({ totalDocuments: 0, laws: { articles: 0, laws: 0 }, judgments: { total: 0 }, gazette: { total: 0 }, tameems: { total: 0 } });
+      res.json({ totalDocuments: 0, laws: { articles: 0, laws: 0 }, judgments: { total: 0 }, gazette: { total: 0 }, tameems: { total: 0 }, principles: { total: 0 } });
     }
   });
 
@@ -1355,19 +1415,28 @@ export async function registerRoutes(
         .offset(offset)
         .orderBy(orderClause);
 
-      // Get total count for pagination
-      const [countResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(judgments)
-        .where(whereClause);
+      // Get total count for pagination - use cached counts for source-only filters
+      let total: number;
+      const countCacheKey = `jcount-${source || "all"}-${city || ""}-${court || ""}-${year || ""}-${hasDate || ""}-${judge || ""}-${q || ""}`;
+      const cachedCount = facetsCache.get(countCacheKey);
+      if (cachedCount && Date.now() - cachedCount.ts < FACETS_TTL) {
+        total = cachedCount.data;
+      } else {
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(judgments)
+          .where(whereClause);
+        total = Number(countResult.count);
+        facetsCache.set(countCacheKey, { data: total, ts: Date.now() });
+      }
 
       res.json({
         data: results,
         pagination: {
           page,
           limit,
-          total: Number(countResult.count),
-          totalPages: Math.ceil(Number(countResult.count) / limit)
+          total,
+          totalPages: Math.ceil(total / limit)
         }
       });
     } catch (error) {
@@ -1377,36 +1446,66 @@ export async function registerRoutes(
   });
 
   // Faceted counts - MUST be before :id route
+  // Pre-compute and cache facets (GROUP BY on 568K rows is very slow)
+  const facetsCache = new Map<string, { data: any; ts: number }>();
+  const FACETS_TTL = 3600_000; // 1 hour
+
+  // Pre-warm facets cache in background after server starts
+  function warmFacetsCache(sourceKey: string) {
+    const srcFilter = sourceKey ? " AND source = ?" : "";
+    const srcParam = sourceKey ? [sourceKey] : [];
+    try {
+      const cities = sqlite.prepare(
+        `SELECT city, count(*) as count FROM judgments WHERE city IS NOT NULL AND city != ''${srcFilter} GROUP BY city ORDER BY count DESC LIMIT 50`
+      ).all(...srcParam);
+      const courts = sqlite.prepare(
+        `SELECT court_body as court, count(*) as count FROM judgments WHERE court_body IS NOT NULL AND court_body != ''${srcFilter} GROUP BY court_body ORDER BY count DESC LIMIT 50`
+      ).all(...srcParam);
+      const years = sqlite.prepare(
+        `SELECT year_hijri as year, count(*) as count FROM judgments WHERE year_hijri IS NOT NULL${srcFilter} GROUP BY year_hijri ORDER BY year_hijri DESC`
+      ).all(...srcParam);
+      const result = { cities, courts, years };
+      facetsCache.set(`facets-${sourceKey || "all"}`, { data: result, ts: Date.now() });
+      console.log(`Facets cache warmed for ${sourceKey || "all"}`);
+    } catch (e: any) {
+      console.warn(`Facets cache warm failed for ${sourceKey || "all"}:`, e.message);
+    }
+  }
+
+  // Warm Saudi facets first (fast, has city/year data), then Egyptian (slow but cached)
+  setTimeout(() => warmFacetsCache("sa_judicial"), 1000);
+  setTimeout(() => warmFacetsCache("bog_judicial"), 2000);
+  setTimeout(() => warmFacetsCache("eg_naqd"), 3000);
+  setTimeout(() => warmFacetsCache(""), 5000);
+
   app.get("/api/judgments/facets", async (req, res) => {
     try {
       const { source } = req.query;
-      const sourceCondition = source ? eq(judgments.source, source as string) : undefined;
+      const cacheKey = `facets-${source || "all"}`;
+      const cached = facetsCache.get(cacheKey);
+      if (cached) {
+        res.set("Cache-Control", "public, max-age=600");
+        return res.json(cached.data);
+      }
 
-      const cities = await db
-        .select({ city: judgments.city, count: sql<number>`count(*)` })
-        .from(judgments)
-        .where(sourceCondition ? and(sql`city IS NOT NULL AND city != ''`, sourceCondition) : sql`city IS NOT NULL AND city != ''`)
-        .groupBy(judgments.city)
-        .orderBy(sql`count(*) DESC`)
-        .limit(50);
+      // If not cached yet, compute now
+      const srcFilter = source ? " AND source = ?" : "";
+      const srcParam = source ? [source] : [];
 
-      const courts = await db
-        .select({ court: judgments.courtBody, count: sql<number>`count(*)` })
-        .from(judgments)
-        .where(sourceCondition ? and(sql`court_body IS NOT NULL AND court_body != ''`, sourceCondition) : sql`court_body IS NOT NULL AND court_body != ''`)
-        .groupBy(judgments.courtBody)
-        .orderBy(sql`count(*) DESC`)
-        .limit(50);
+      const cities = sqlite.prepare(
+        `SELECT city, count(*) as count FROM judgments WHERE city IS NOT NULL AND city != ''${srcFilter} GROUP BY city ORDER BY count DESC LIMIT 50`
+      ).all(...srcParam);
+      const courts = sqlite.prepare(
+        `SELECT court_body as court, count(*) as count FROM judgments WHERE court_body IS NOT NULL AND court_body != ''${srcFilter} GROUP BY court_body ORDER BY count DESC LIMIT 50`
+      ).all(...srcParam);
+      const years = sqlite.prepare(
+        `SELECT year_hijri as year, count(*) as count FROM judgments WHERE year_hijri IS NOT NULL${srcFilter} GROUP BY year_hijri ORDER BY year_hijri DESC`
+      ).all(...srcParam);
 
-      const years = await db
-        .select({ year: judgments.yearHijri, count: sql<number>`count(*)` })
-        .from(judgments)
-        .where(sourceCondition ? and(sql`year_hijri IS NOT NULL`, sourceCondition) : sql`year_hijri IS NOT NULL`)
-        .groupBy(judgments.yearHijri)
-        .orderBy(desc(judgments.yearHijri));
-
-      res.set("Cache-Control", "public, max-age=3600");
-      res.json({ cities, courts, years });
+      const result = { cities, courts, years };
+      facetsCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.set("Cache-Control", "public, max-age=600");
+      res.json(result);
     } catch (error) {
       console.error("Error fetching facets:", error);
       res.status(500).json({ message: "Failed to fetch facets" });
@@ -1792,6 +1891,148 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching gazette:", error);
       res.status(500).json({ message: "Failed to fetch gazette data" });
+    }
+  });
+
+  // ============================================
+  // CRSD Principles (المبادئ القضائية) API
+  // ============================================
+  app.get("/api/principles", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const offset = (page - 1) * limit;
+      const section = req.query.section as string;
+      const q = (req.query.q as string || "").trim();
+
+      // FTS search path
+      if (q.length >= 2 && searchCrsdStmt) {
+        try {
+          const ftsQuery = buildLegalFtsQuery(q);
+          const extraWhere = section ? ' AND p.section = ?' : '';
+          const params = section ? [ftsQuery, section, limit, offset] : [ftsQuery, limit, offset];
+          const countParams = section ? [ftsQuery, section] : [ftsQuery];
+
+          const items = sqlite.prepare(`
+            SELECT p.id, p.section, p.section_ar, p.principle_text, p.decision_numbers, p.source_ar,
+                   snippet(crsd_principles_fts, 0, '【', '】', '...', 50) as textSnippet,
+                   bm25(crsd_principles_fts) as rank
+            FROM crsd_principles p
+            INNER JOIN crsd_principles_fts fts ON p.id = fts.rowid
+            WHERE crsd_principles_fts MATCH ?${extraWhere}
+            ORDER BY rank
+            LIMIT ? OFFSET ?
+          `).all(...params) as any[];
+
+          const countResult = sqlite.prepare(`
+            SELECT count(*) as c
+            FROM crsd_principles p
+            INNER JOIN crsd_principles_fts fts ON p.id = fts.rowid
+            WHERE crsd_principles_fts MATCH ?${extraWhere}
+          `).get(...countParams) as any;
+
+          // Get section facets for this query
+          const sectionFacets = sqlite.prepare(`
+            SELECT p.section, p.section_ar, count(*) as count
+            FROM crsd_principles p
+            INNER JOIN crsd_principles_fts fts ON p.id = fts.rowid
+            WHERE crsd_principles_fts MATCH ?
+            GROUP BY p.section
+            ORDER BY count DESC
+          `).all(ftsQuery) as any[];
+
+          res.set("Cache-Control", "public, max-age=300");
+          return res.json({ items, total: countResult?.c || 0, page, limit, sections: sectionFacets });
+        } catch {
+          // Fall through to non-FTS path
+        }
+      }
+
+      // Non-FTS path (browse/filter)
+      const conditions: string[] = [];
+      const params: any[] = [];
+      if (section) { conditions.push('section = ?'); params.push(section); }
+      if (q) {
+        conditions.push("principle_text LIKE ?");
+        params.push(`%${q}%`);
+      }
+      const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+      const total = (sqlite.prepare(`SELECT count(*) as c FROM crsd_principles ${where}`).get(...params) as any)?.c || 0;
+      const items = sqlite.prepare(`
+        SELECT id, section, section_ar, principle_text, decision_numbers, source_ar
+        FROM crsd_principles ${where}
+        ORDER BY section, id
+        LIMIT ? OFFSET ?
+      `).all(...params, limit, offset) as any[];
+
+      // Section facets
+      const sectionFacets = sqlite.prepare(`
+        SELECT section, section_ar, count(*) as count
+        FROM crsd_principles
+        GROUP BY section
+        ORDER BY count DESC
+      `).all() as any[];
+
+      res.set("Cache-Control", "public, max-age=300");
+      res.json({
+        items: items.map((i: any) => ({
+          ...i,
+          decision_numbers: typeof i.decision_numbers === 'string' ? JSON.parse(i.decision_numbers) : i.decision_numbers,
+        })),
+        total,
+        page,
+        limit,
+        sections: sectionFacets,
+      });
+    } catch (error) {
+      console.error("Error fetching principles:", error);
+      res.status(500).json({ message: "Failed to fetch principles" });
+    }
+  });
+
+  app.get("/api/principles/facets", async (req, res) => {
+    try {
+      const sections = sqlite.prepare(`
+        SELECT section, section_ar, count(*) as count
+        FROM crsd_principles
+        GROUP BY section
+        ORDER BY count DESC
+      `).all() as any[];
+
+      const total = (sqlite.prepare("SELECT count(*) as cnt FROM crsd_principles").get() as any)?.cnt || 0;
+
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json({ sections, total });
+    } catch (error) {
+      console.error("Error fetching principle facets:", error);
+      res.status(500).json({ message: "Failed to fetch principle facets" });
+    }
+  });
+
+  app.get("/api/principles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid principle ID" });
+      }
+
+      const result = sqlite.prepare(`
+        SELECT id, section, section_ar, principle_text, decision_numbers, source, source_ar, created_at
+        FROM crsd_principles WHERE id = ?
+      `).get(id) as any;
+
+      if (!result) {
+        return res.status(404).json({ message: "Principle not found" });
+      }
+
+      res.json({
+        ...result,
+        decision_numbers: typeof result.decision_numbers === 'string' ? JSON.parse(result.decision_numbers) : result.decision_numbers,
+      });
+    } catch (error) {
+      console.error("Error fetching principle:", error);
+      res.status(500).json({ message: "Failed to fetch principle" });
     }
   });
 

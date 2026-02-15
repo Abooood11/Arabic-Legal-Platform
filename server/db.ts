@@ -44,6 +44,34 @@ try {
 }
 
 // ============================================
+// Judgments Schema Migration: add principle_text column
+// ============================================
+try {
+    const cols = sqlite.prepare("PRAGMA table_info(judgments)").all() as any[];
+    if (!cols.find((c: any) => c.name === "principle_text")) {
+        sqlite.exec(`ALTER TABLE judgments ADD COLUMN principle_text TEXT;`);
+        console.log("Added principle_text column to judgments table.");
+    }
+} catch (e: any) {
+    console.warn("principle_text migration note:", e.message);
+}
+
+// ============================================
+// Judgments Performance Indexes
+// ============================================
+try {
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS judgments_source_idx ON judgments(source);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS judgments_source_date_idx ON judgments(source, judgment_date DESC);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS judgments_date_idx ON judgments(judgment_date DESC);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS judgments_court_body_idx ON judgments(court_body);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS judgments_year_hijri_idx ON judgments(year_hijri);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS judgments_city_idx ON judgments(city);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS judgments_case_id_idx ON judgments(case_id);`);
+} catch (e: any) {
+    console.warn("Judgments index creation note:", e.message);
+}
+
+// ============================================
 // Gazette Index Table + FTS5
 // ============================================
 try {
@@ -301,6 +329,55 @@ try {
     console.log("Error reports table ready.");
 } catch (e: any) {
     console.warn("Error reports table setup:", e.message);
+}
+
+// ============================================
+// CRSD Principles Table + FTS5
+// ============================================
+try {
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS crsd_principles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            section TEXT NOT NULL,
+            section_ar TEXT NOT NULL,
+            principle_text TEXT NOT NULL,
+            decision_numbers TEXT,
+            source TEXT NOT NULL DEFAULT 'crsd_appeal_committee',
+            source_ar TEXT NOT NULL DEFAULT 'لجنة الاستئناف في منازعات الأوراق المالية',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+    `);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_section_idx ON crsd_principles(section);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_source_idx ON crsd_principles(source);`);
+
+    // Create FTS5 for CRSD principles search
+    sqlite.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS crsd_principles_fts USING fts5(
+            principle_text,
+            section_ar,
+            content='crsd_principles',
+            content_rowid='id',
+            tokenize='unicode61 remove_diacritics 2'
+        );
+    `);
+
+    // Check if FTS table is populated
+    const crsdCount = sqlite.prepare("SELECT count(*) as cnt FROM crsd_principles").get() as any;
+    const crsdFtsCount = sqlite.prepare("SELECT count(*) as cnt FROM crsd_principles_fts").get() as any;
+
+    if (crsdFtsCount.cnt === 0 && crsdCount.cnt > 0) {
+        console.log("Populating CRSD principles FTS index...");
+        sqlite.exec(`INSERT INTO crsd_principles_fts(rowid, principle_text, section_ar) SELECT id, principle_text, section_ar FROM crsd_principles;`);
+        console.log("CRSD principles FTS index populated.");
+    }
+
+    if (crsdCount.cnt > 0) {
+        console.log(`CRSD principles table ready: ${crsdCount.cnt} principles.`);
+    } else {
+        console.log("CRSD principles table ready (empty - run import script).");
+    }
+} catch (e: any) {
+    console.warn("CRSD principles setup:", e.message);
 }
 
 console.log(`Database connected: ${dbPath}`);
