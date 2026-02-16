@@ -1294,7 +1294,8 @@ export async function registerRoutes(
           if (city) { filters.push("j.city LIKE ?"); params.push(city); }
           if (year) { filters.push("j.year_hijri = ?"); params.push(parseInt(year as string)); }
           if (court) { filters.push("j.court_body LIKE ?"); params.push(`%${court}%`); }
-          if (source) { filters.push("j.source = ?"); params.push(source); }
+          if (source === "sa_all") { filters.push("j.source IN ('sa_judicial', 'bog_judicial')"); }
+          else if (source) { filters.push("j.source = ?"); params.push(source); }
           if (hasDate === "true") { filters.push("j.judgment_date IS NOT NULL AND j.judgment_date != ''"); }
           if (judge) { filters.push("j.judges LIKE ?"); params.push(`%${judge}%`); }
 
@@ -1369,7 +1370,9 @@ export async function registerRoutes(
       if (hasDate === "true") {
         conditions.push(sql`judgment_date IS NOT NULL AND judgment_date != ''`);
       }
-      if (source) {
+      if (source === "sa_all") {
+        conditions.push(sql`source IN ('sa_judicial', 'bog_judicial')`);
+      } else if (source) {
         conditions.push(eq(judgments.source, source as string));
       }
       if (judge) {
@@ -1452,8 +1455,8 @@ export async function registerRoutes(
 
   // Pre-warm facets cache in background after server starts
   function warmFacetsCache(sourceKey: string) {
-    const srcFilter = sourceKey ? " AND source = ?" : "";
-    const srcParam = sourceKey ? [sourceKey] : [];
+    const srcFilter = sourceKey === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial')" : sourceKey ? " AND source = ?" : "";
+    const srcParam = sourceKey === "sa_all" ? [] : sourceKey ? [sourceKey] : [];
     try {
       const cities = sqlite.prepare(
         `SELECT city, count(*) as count FROM judgments WHERE city IS NOT NULL AND city != ''${srcFilter} GROUP BY city ORDER BY count DESC LIMIT 50`
@@ -1473,10 +1476,9 @@ export async function registerRoutes(
   }
 
   // Warm Saudi facets first (fast, has city/year data), then Egyptian (slow but cached)
-  setTimeout(() => warmFacetsCache("sa_judicial"), 1000);
-  setTimeout(() => warmFacetsCache("bog_judicial"), 2000);
-  setTimeout(() => warmFacetsCache("eg_naqd"), 3000);
-  setTimeout(() => warmFacetsCache(""), 5000);
+  setTimeout(() => warmFacetsCache("sa_all"), 1000);
+  setTimeout(() => warmFacetsCache("eg_naqd"), 2000);
+  setTimeout(() => warmFacetsCache(""), 4000);
 
   app.get("/api/judgments/facets", async (req, res) => {
     try {
@@ -1489,8 +1491,8 @@ export async function registerRoutes(
       }
 
       // If not cached yet, compute now
-      const srcFilter = source ? " AND source = ?" : "";
-      const srcParam = source ? [source] : [];
+      const srcFilter = source === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial')" : source ? " AND source = ?" : "";
+      const srcParam = source === "sa_all" ? [] : source ? [source] : [];
 
       const cities = sqlite.prepare(
         `SELECT city, count(*) as count FROM judgments WHERE city IS NOT NULL AND city != ''${srcFilter} GROUP BY city ORDER BY count DESC LIMIT 50`

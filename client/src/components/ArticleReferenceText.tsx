@@ -591,7 +591,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
               const hasNumeric = markers.some(m => isNumericMarker(m));
               const hasMixedLevels = hasOrdinals && hasNumeric;
 
-              type VP = { marker: string; text: string; visualLevel: number };
+              type VP = { marker: string; text: string; dataLevel: number; visualLevel: number };
               const rawVps: VP[] = normalizedParas.map(np => {
                 let vl = np.dataLevel;
                 if (hasMixedLevels && np.marker) {
@@ -599,7 +599,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                   else if (isNumericMarker(np.marker)) vl = 1;
                   else if (isLetterMarker(np.marker)) vl = 2;
                 }
-                return { marker: np.marker, text: np.text, visualLevel: vl };
+                return { marker: np.marker, text: np.text, dataLevel: np.dataLevel, visualLevel: vl };
               });
 
               // Normalize levels: shift so the minimum marker level becomes 0
@@ -629,8 +629,12 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                   );
                 }
 
+                // If this paragraph is at dataLevel 0 (top-level), don't indent —
+                // it's a new item, not a continuation of a sub-list.
                 let prevMarkerLevel = -1;
-                if (idx > 0) {
+                if (vp.dataLevel === 0) {
+                  prevMarkerLevel = -1; // top-level: no indent
+                } else if (idx > 0) {
                   for (let pi = idx - 1; pi >= 0; pi--) {
                     if (vps[pi].marker) { prevMarkerLevel = vps[pi].visualLevel; break; }
                   }
@@ -638,7 +642,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                 const contIndent = prevMarkerLevel >= 2 ? 88 : prevMarkerLevel >= 1 ? 58 : prevMarkerLevel === 0 ? 28 : 0;
 
                 return (
-                  <div key={idx} style={{ marginRight: `${contIndent}px`, whiteSpace: 'pre-wrap' }}>
+                  <div key={idx} style={{ marginInlineStart: `${contIndent}px`, whiteSpace: 'pre-wrap' }}>
                     {nestingLevel < maxNestingLevel ? (
                       <ArticleReferenceText
                         text={vp.text}

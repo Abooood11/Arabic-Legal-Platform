@@ -1224,8 +1224,12 @@ export default function LawDetail() {
                             }
 
                             // Continuation paragraph without marker: align with text of previous marker
+                            // But if this paragraph is at dataLevel 0 (top-level definition), don't indent —
+                            // it's a new item, not a continuation of a sub-list.
                             let prevMarkerLevel = -1;
-                            if (idx > 0) {
+                            if (vp.dataLevel === 0) {
+                              prevMarkerLevel = -1; // top-level: no indent
+                            } else if (idx > 0) {
                               for (let pi = idx - 1; pi >= 0; pi--) {
                                 if (visualParas[pi].marker) {
                                   prevMarkerLevel = visualParas[pi].visualLevel;
@@ -1237,7 +1241,7 @@ export default function LawDetail() {
                             const contIndent = prevMarkerLevel >= 2 ? 88 : prevMarkerLevel >= 1 ? 58 : prevMarkerLevel === 0 ? 28 : 0;
 
                             return (
-                              <div key={idx} style={{ marginRight: `${contIndent}px`, whiteSpace: 'pre-wrap' }}>
+                              <div key={idx} style={{ marginInlineStart: `${contIndent}px`, whiteSpace: 'pre-wrap' }}>
                                 <ArticleReferenceText
                                   text={text}
                                   articles={law.articles}
@@ -1300,7 +1304,7 @@ export default function LawDetail() {
                                         if (part.type === 'table' && part.table_rows) {
                                           // Render table — indent if it follows a marked line
                                           return (
-                                            <div key={`part-${pi}`} className="overflow-x-auto my-2" style={lastLineHadMarker ? { marginRight: '40px' } : {}}>
+                                            <div key={`part-${pi}`} className="overflow-x-auto my-2" style={lastLineHadMarker ? { marginInlineStart: '40px' } : {}}>
                                               <table className="w-full border-collapse text-sm" style={{ direction: 'rtl' }}>
                                                 <tbody>
                                                   {part.table_rows.map((row: string[], ri: number) => (
@@ -1332,7 +1336,7 @@ export default function LawDetail() {
                                               if (letterMatch) {
                                                 lastLineHadMarker = true;
                                                 return (
-                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-foreground" style={{ direction: 'rtl', marginRight: '16px' }}>
+                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-foreground" style={{ direction: 'rtl', marginInlineStart: '16px' }}>
                                                     <span className="font-bold text-primary shrink-0">{letterMatch[1]}-</span>
                                                     <span className="leading-relaxed">{toHindiNumerals(trimmed.slice(letterMatch[0].length))}</span>
                                                   </div>
@@ -1341,7 +1345,7 @@ export default function LawDetail() {
                                               if (numMatch) {
                                                 lastLineHadMarker = true;
                                                 return (
-                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-foreground" style={{ direction: 'rtl', marginRight: '16px' }}>
+                                                  <div key={li} className="flex gap-1.5 my-1 text-sm text-foreground" style={{ direction: 'rtl', marginInlineStart: '16px' }}>
                                                     <span className="font-bold text-primary shrink-0">{toHindiNumerals(numMatch[1])}-</span>
                                                     <span className="leading-relaxed">{toHindiNumerals(trimmed.slice(numMatch[0].length))}</span>
                                                   </div>

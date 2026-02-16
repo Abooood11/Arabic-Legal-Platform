@@ -66,16 +66,8 @@ interface Facets {
     years: { year: number; count: number }[];
 }
 
-type SourceTab = "" | "sa_judicial" | "eg_naqd";
+type SourceTab = "" | "sa_all" | "eg_naqd";
 
-const SAUDI_LEGAL_QUERIES = [
-    "مبدأ قضائي",
-    "مادة 77 عقد العمل",
-    "تعويض ضرر",
-    "فسخ عقد إيجار",
-    "حضانة أطفال",
-    "نفقة زوجية",
-];
 
 const TABS: { key: SourceTab; label: string; shortLabel: string; icon: React.ReactNode; color: string; activeColor: string; badgeColor: string }[] = [
     {
@@ -88,7 +80,7 @@ const TABS: { key: SourceTab; label: string; shortLabel: string; icon: React.Rea
         badgeColor: "",
     },
     {
-        key: "sa_judicial",
+        key: "sa_all",
         label: "المحاكم السعودية",
         shortLabel: "السعودية",
         icon: <Landmark className="h-4 w-4" />,
@@ -146,12 +138,15 @@ function SourceBadge({ source }: { source?: string }) {
             </Badge>
         );
     }
-    return (
-        <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5 text-[11px] gap-1">
-            <Landmark className="h-3 w-3" />
-            السعودية
-        </Badge>
-    );
+    if (source === "bog_judicial" || source === "sa_judicial") {
+        return (
+            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5 text-[11px] gap-1">
+                <Landmark className="h-3 w-3" />
+                السعودية
+            </Badge>
+        );
+    }
+    return null;
 }
 
 export default function Judgments() {
@@ -226,9 +221,9 @@ export default function Judgments() {
         queryFn: async () => { const r = await fetch("/api/judgments?limit=1"); const j = await r.json(); return { count: j.pagination.total }; },
         staleTime: 120000,
     });
-    const { data: saCount } = useQuery<{ count: number }>({
-        queryKey: ["judgments-count-sa"],
-        queryFn: async () => { const r = await fetch("/api/judgments?limit=1&source=sa_judicial"); const j = await r.json(); return { count: j.pagination.total }; },
+    const { data: saAllCount } = useQuery<{ count: number }>({
+        queryKey: ["judgments-count-sa-all"],
+        queryFn: async () => { const r = await fetch("/api/judgments?limit=1&source=sa_all"); const j = await r.json(); return { count: j.pagination.total }; },
         staleTime: 120000,
     });
     const { data: egCount } = useQuery<{ count: number }>({
@@ -236,7 +231,7 @@ export default function Judgments() {
         queryFn: async () => { const r = await fetch("/api/judgments?limit=1&source=eg_naqd"); const j = await r.json(); return { count: j.pagination.total }; },
         staleTime: 120000,
     });
-    const tabCounts: Record<SourceTab, number | undefined> = { "": allCount?.count, sa_judicial: saCount?.count, eg_naqd: egCount?.count };
+    const tabCounts: Record<SourceTab, number | undefined> = { "": allCount?.count, sa_all: saAllCount?.count, eg_naqd: egCount?.count };
 
     const hasFilters = cityFilter || courtFilter || yearFilter || judgeFilter;
     const clearFilters = () => { setCityFilter(""); setCourtFilter(""); setYearFilter(""); clearJudgeFilter(); };
@@ -300,16 +295,6 @@ export default function Judgments() {
                         >
                             {exactSearch ? "✓ بحث حرفي" : "بحث حرفي"}
                         </Button>
-                        <span className="text-xs text-muted-foreground">بحث شائع:</span>
-                        {SAUDI_LEGAL_QUERIES.map((q) => (
-                            <button
-                                key={q}
-                                onClick={() => setSearch(q)}
-                                className="text-xs px-2.5 py-1 rounded-full bg-primary/5 text-primary hover:bg-primary/10 transition-colors border border-primary/20"
-                            >
-                                {q}
-                            </button>
-                        ))}
                     </div>
                     {!exactSearch && search && (
                         <p className="text-xs text-muted-foreground mt-2 max-w-2xl">
@@ -371,6 +356,36 @@ export default function Judgments() {
                         </Select>
                     </div>
                 </div>
+
+                {/* Court sub-tabs row */}
+                {activeTab && facets?.courts && facets.courts.length > 1 && (
+                    <div className="border-t bg-muted/30">
+                        <div className="container mx-auto px-4">
+                            <div className="flex items-center gap-1.5 py-1.5 overflow-x-auto">
+                                <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <button
+                                    onClick={() => setCourtFilter("")}
+                                    className={`text-xs px-2.5 py-1 rounded-md whitespace-nowrap transition-all ${
+                                        !courtFilter ? "bg-background shadow-sm font-semibold text-foreground border" : "text-muted-foreground hover:bg-background/60"
+                                    }`}
+                                >
+                                    الكل
+                                </button>
+                                {facets.courts.map((c) => (
+                                    <button
+                                        key={c.court}
+                                        onClick={() => setCourtFilter(courtFilter === c.court ? "" : c.court)}
+                                        className={`text-xs px-2.5 py-1 rounded-md whitespace-nowrap transition-all ${
+                                            courtFilter === c.court ? "bg-primary/10 text-primary font-semibold border border-primary/20" : "text-muted-foreground hover:bg-background/60"
+                                        }`}
+                                    >
+                                        {c.court} <span className="text-[10px] opacity-60">{c.count.toLocaleString("en")}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Inline Filter Panel */}
                 {filterOpen && (
@@ -506,11 +521,10 @@ export default function Judgments() {
 
                             {data?.data.map((item) => {
                                 const isEg = item.source === "eg_naqd";
+                                const borderColor = isEg ? "border-r-amber-500" : "border-r-primary";
                                 return (
                                     <Link key={item.id} href={`/judgments/${item.id}`} className="block">
-                                        <div className={`group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer ${
-                                            isEg ? "border-r-4 border-r-amber-500" : "border-r-4 border-r-primary"
-                                        }`}>
+                                        <div className={`group bg-background border rounded-xl p-4 hover:shadow-md hover:border-primary/30 transition-all cursor-pointer border-r-4 ${borderColor}`}>
                                             {/* Top row: source badge + metadata */}
                                             <div className="flex items-start justify-between gap-3 mb-2">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -535,22 +549,20 @@ export default function Judgments() {
                                                         {item.city}
                                                     </span>
                                                 )}
-                                                {item.yearHijri && (
+                                                {item.judgmentDate ? (
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {fixArabicDate(item.judgmentDate)}
+                                                    </span>
+                                                ) : item.yearHijri ? (
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
                                                         {item.yearHijri}{isEg ? "" : "هـ"}
                                                     </span>
-                                                )}
+                                                ) : null}
                                                 {item.judgmentNumber && (
-                                                    <span className="flex items-center gap-1">
-                                                        <Hash className="h-3 w-3" />
-                                                        {isEg ? `طعن ${item.judgmentNumber}` : item.judgmentNumber}
-                                                    </span>
-                                                )}
-                                                {item.judgmentDate && (
-                                                    <span className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {fixArabicDate(item.judgmentDate)}
+                                                    <span className="flex items-center gap-1 text-muted-foreground">
+                                                        {isEg ? `طعن ${item.judgmentNumber}` : `رقم الحكم: ${item.judgmentNumber}`}
                                                     </span>
                                                 )}
                                             </div>

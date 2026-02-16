@@ -35,6 +35,8 @@ import {
     findHighlightableTokens,
     extractJudges,
     parseBogMetadata,
+    parseSaudiCaseInfo,
+    stripSaudiHeader,
     fixArabicDate,
     stripPdfBookArtifacts,
     type HighlightedToken,
@@ -57,11 +59,7 @@ interface Judgment {
     appealType?: string;
 }
 
-const TOKEN_STYLES: Record<string, string> = {
-    amount:  "bg-green-100/70 text-green-800 border-b border-green-400",
-    article: "bg-blue-100/70 text-blue-800 border-b border-blue-400",
-    date:    "bg-orange-100/70 text-orange-800 border-b border-orange-400",
-};
+const TOKEN_STYLES: Record<string, string> = {};
 
 /**
  * Section divider configs.
@@ -92,9 +90,17 @@ const SECTION_DIVIDERS: { patterns: RegExp[]; label: string; color: string; bg: 
         keepMatchInText: true,
     },
     {
-        // BOG appeal/review ruling: "حكمت المحكمة بتأييد..." or "حكمت الهيئة بتأييد..."
-        // Appears after the خاتمة as the appellate court's final ruling
-        patterns: [/حكمت (?:المحكمة|الهيئة|الدائرة) بتأييد/],
+        // BOG appeal section: multiple patterns
+        // 1. Short: "حكمت المحكمة بتأييد..." or "حكمت الهيئة بتأييد..."
+        // 2. Long: "تمت المرافعة أمام محكمة الاستئناف..."
+        // 3. هيئة التدقيق header before appeal ruling
+        patterns: [
+            /تمت المرافعة أمام محكمة الاستئناف/,
+            /هيئة التدقيق\s+حكمت/,
+            /هيئة التثقيف\s+حكمت/,
+            /حكمت (?:المحكمة|الهيئة|الدائرة)[:\s]+بتأييد/,
+            /حكمت (?:المحكمة|الهيئة|الدائرة) بتأييد/,
+        ],
         label: "حكم الاستئناف",
         color: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-300",
         keepMatchInText: true,
@@ -212,7 +218,11 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
             .replace(/0[A-F][A-F0-9]/g, '')    // remaining inline hex artifacts
             .replace(/www\.\w+\.com/g, '')      // stray URLs
             .replace(/^-{3,}$/gm, '')           // horizontal rules (---)
-            .replace(/\n{3,}/g, '\n\n');        // collapse 3+ blank lines
+            .replace(/\n{3,}/g, '\n\n')         // collapse 3+ blank lines
+            .replace(/هيئة التثقيف/g, 'هيئة التدقيق')  // OCR: التثقيف → التدقيق
+            .replace(/هيئه التثقيف/g, 'هيئة التدقيق')
+            .replace(/\s*\d{1,3}\s*-\s*\d{1,3}\s*$/g, '')  // trailing page numbers (e.g. "1 - 11")
+            .replace(/^\s*\d{1,3}\s*-\s*\d{1,3}\s*$/gm, '');  // page numbers on own line
 
         // Fix date display issues (ه→٥ OCR, / → - BiDi, هو→هـ OCR)
         cleanText = fixArabicDate(cleanText);
@@ -225,13 +235,26 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
         cleanText = stripPdfBookArtifacts(cleanText);
 
         // Remove leaked next-judgment content.
-        // Detect: after appeal confirmation, if a judgment metadata block appears
-        // (2+ consecutive "رقم ال..." lines = new judgment headers), truncate from there.
-        // This catches all cases regardless of OCR corruption of بسم الله.
+        // BOG books often have 2+ judgments per page. OCR merges them into one text.
+        // Detect: after closing prayer (وصلى الله...أجمعين), if new judgment metadata
+        // appears (رقم الحكم في المجموعة, or 2+ consecutive رقم ال... lines), truncate.
+        // Pattern 1: After closing prayer + new judgment header block
         cleanText = cleanText.replace(
-            /(حكمت (?:المحكمة|الهيئة) بتأييد الحكم فيما انتهى إليه من قضاء[.،]?)[\s\S]*?((?:^|\n)رقم ال\S+\s+.+\n\s*رقم ال\S+\s+[\s\S]*)$/,
+            /(وصلى الله وسلم على نبينا محمد وعلى آله وصحبه أجمعين[.،]?\s*)(?:رقم الحكم في المجموعة[\s\S]*)$/,
             '$1'
         );
+        // Pattern 2: After appeal confirmation + new judgment headers
+        cleanText = cleanText.replace(
+            /(حكمت (?:المحكمة|الهيئة|الدائرة) بتأييد[^.]*[.،]?\s*(?:وصلى[^]*?أجمعين[.،]?\s*)?)(?:رقم ال\S+\s+.+\n\s*رقم ال\S+[\s\S]*)$/,
+            '$1'
+        );
+        // Pattern 3: General - any "رقم الحكم في المجموعة" after first 500 chars is a leak
+        {
+            const leakIdx = cleanText.indexOf('رقم الحكم في المجموعة', 500);
+            if (leakIdx > 500) {
+                cleanText = cleanText.substring(0, leakIdx).trim();
+            }
+        }
 
         // Mark standalone section headers with sentinel tokens before reflow.
         // Use \n\n around sentinels to guarantee they become their own paragraph
@@ -492,6 +515,7 @@ export default function JudgmentDetail() {
     });
 
     const isEgyptian = judgment?.source === "eg_naqd";
+    const isBog = judgment?.source === "bog_judicial";
 
     const displayCourtName = useMemo(() => {
         if (!judgment) return "";
@@ -550,6 +574,11 @@ export default function JudgmentDetail() {
         return parseBogMetadata(judgment.text, judgment.source, judgment.caseId, judgment.courtBody);
     }, [judgment?.text, judgment?.source, judgment?.caseId, judgment?.courtBody]);
 
+    const saudiCaseInfo = useMemo(() => {
+        if (!judgment?.text) return null;
+        return parseSaudiCaseInfo(judgment.text, judgment.source);
+    }, [judgment?.text, judgment?.source]);
+
     if (isLoading) {
         return (
             <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -583,7 +612,7 @@ export default function JudgmentDetail() {
         chips.push({ icon: Building2, label: isEgyptian ? "نوع الطعن" : "الدائرة", value: judgment.circuitType });
     }
     if (judgment.judgmentNumber) {
-        chips.push({ icon: Hash, label: isEgyptian ? "رقم الطعن" : "رقم الحكم", value: judgment.judgmentNumber });
+        chips.push({ icon: Landmark, label: isEgyptian ? "رقم الطعن" : "رقم الحكم", value: judgment.judgmentNumber });
     }
     if (judgment.judgmentDate) {
         chips.push({ icon: Calendar, label: isEgyptian ? "تاريخ الجلسة" : "تاريخ الحكم", value: fixArabicDate(judgment.judgmentDate) });
@@ -653,7 +682,7 @@ export default function JudgmentDetail() {
             <div className="container mx-auto px-4 py-6 max-w-4xl">
                 {/* Header */}
                 <div className={`mb-5 p-5 rounded-2xl bg-background border shadow-sm border-r-4 ${
-                    isEgyptian ? "border-r-amber-500" : "border-r-primary"
+                    isEgyptian ? "border-r-amber-500" : isBog ? "border-r-emerald-600" : "border-r-primary"
                 }`}>
                     <div className="flex items-start justify-between gap-3 mb-3">
                         <h1 className="text-lg font-bold text-foreground leading-snug">
@@ -662,6 +691,10 @@ export default function JudgmentDetail() {
                         {isEgyptian ? (
                             <Badge variant="outline" className="border-amber-600/30 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 text-[10px] gap-1 shrink-0">
                                 <Scale className="h-3 w-3" /> مصر
+                            </Badge>
+                        ) : isBog ? (
+                            <Badge variant="outline" className="border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-[10px] gap-1 shrink-0">
+                                <Gavel className="h-3 w-3" /> إدارية
                             </Badge>
                         ) : (
                             <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5 text-[10px] gap-1 shrink-0">
@@ -684,6 +717,24 @@ export default function JudgmentDetail() {
                         </div>
                     </div>
                 </div>
+
+                {/* Saudi MOJ Case Info Panel */}
+                {saudiCaseInfo && saudiCaseInfo.length > 0 && (
+                    <div className="rounded-2xl bg-background border shadow-sm p-5 mb-5">
+                        <div className="flex items-center gap-2 mb-3 text-sm font-bold text-slate-600">
+                            <Landmark className="h-4 w-4" />
+                            <span>بيانات القضية</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {saudiCaseInfo.map((info, i) => (
+                                <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100">
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5">{info.label}:</span>
+                                    <span className="text-sm font-medium text-slate-800">{fixArabicDate(info.value)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* BOG Metadata Panel */}
                 {bogMeta && (bogMeta.caseInfo.length > 0 || bogMeta.principles.length > 0 || bogMeta.legalBasis.length > 0) && (
@@ -718,7 +769,7 @@ export default function JudgmentDetail() {
                         </div>
                     )}
                     <JudgmentTextBody
-                        text={bogMeta?.bodyText || judgment.text}
+                        text={bogMeta?.bodyText || (saudiCaseInfo ? stripSaudiHeader(judgment.text) : judgment.text)}
                         searchTerm={searchTerm}
                     />
                 </div>

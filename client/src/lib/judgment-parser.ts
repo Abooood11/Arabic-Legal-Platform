@@ -13,6 +13,8 @@
  */
 export function fixArabicDate(text: string): string {
     return text
+        // Strip leading ": " prefix from dates
+        .replace(/^:\s*/, '')
         // Fix OCR ه→٥ in Hijri dates with Arabic-Indic digits
         .replace(/ه\/ه(\/[١][٣٤][٠-٩]{2})/g, '٥/٥$1')             // ه/ه/1Yxx (both are ه)
         .replace(/ه(\/[٠-٩]{1,2}\/[١][٣٤][٠-٩]{2})/g, '٥$1')
@@ -25,10 +27,13 @@ export function fixArabicDate(text: string): string {
         .replace(/(\d{1,2}\/)ه(\/1[34]\d{2})/g, '$15$2')
         .replace(/(1[34]\d{2}\/\d{1,2}\/)ه(?=[^\d٠-٩]|$)/g, '$15')
         .replace(/(1[34]\d{2}\/)ه(\/\d{1,2})/g, '$15$2')
+        // Reverse YYYY/M/D → D/M/YYYY for Western Hijri dates (year first)
+        .replace(/(1[34]\d{2})\/(\d{1,2})\/(\d{1,2})/g, '$3/$2/$1')
+        // Reverse YYYY/M/D → D/M/YYYY for Arabic-Indic digits (year first)
+        .replace(/([١][٣٤][٠-٩]{2})\/([٠-٩]{1,2})\/([٠-٩]{1,2})/g, '$3/$2/$1')
         // Fix / → - for Arabic-Indic digits (prevents BiDi visual reversal)
         .replace(/([٠-٩]{1,4})\/([٠-٩]{1,2})\/([٠-٩]{1,4})/g, '$1-$2-$3')
         // Fix / → - for Western digits in Hijri dates
-        .replace(/(1[34]\d{2})\/(\d{1,2})\/(\d{1,2})/g, '$1-$2-$3')
         .replace(/(\d{1,2})\/(\d{1,2})\/(1[34]\d{2})/g, '$1-$2-$3')
         // Fix OCR هو → هـ after dates
         .replace(/([\d٠-٩]+[\/\-.][\d٠-٩]+[\/\-.][\d٠-٩]+)\s*هو(?=[^٠-٩\w]|$)/g, '$1هـ');
@@ -484,6 +489,8 @@ const OCR_DISPLAY_FIXES: [RegExp, string][] = [
     [/فنسختتم الحكيان/g, "مستند الحكم"],
     [/www\.\w+\.com/g, ""],
     [/0AE/g, ""],
+    [/هيئة التثقيف/g, "هيئة التدقيق"],
+    [/هيئه التثقيف/g, "هيئة التدقيق"],
 ];
 
 function fixOcrDisplay(text: string): string {
@@ -521,10 +528,64 @@ function parseBogCollectionName(caseId?: string, courtBody?: string): string | u
         const year = normalMatch[1];
         const vol = normalMatch[2];
         const volName = VOLUME_AR[vol] || vol;
-        const court = courtBody || 'ديوان المظالم';
+        const court = courtBody || 'المحاكم الإدارية';
         return `مجموعة أحكام ${court} ${year}هـ - المجلد ${volName}`;
     }
     return undefined;
+}
+
+/**
+ * Parse Saudi MOJ judgment text to extract case metadata from the header.
+ * The text starts with: "بيانات الحكم القضية رقم XXX ... المحكمة ... المدينة: ... رقم الحكم: ... التاريخ: ..."
+ */
+/**
+ * Strip Saudi MOJ judgment header ("بيانات الحكم ...") from the text
+ * when case info has already been extracted and displayed in a card.
+ * Removes everything from start up to "نص الحكم" or "(الوقائع)" marker.
+ */
+export function stripSaudiHeader(text: string): string {
+    if (!text) return text;
+    // Look for "نص الحكم" marker — everything after it is the actual judgment
+    const nassIdx = text.indexOf("نص الحكم");
+    if (nassIdx !== -1 && nassIdx < 600) {
+        // Skip past "نص الحكم" and optional colon/whitespace
+        let start = nassIdx + "نص الحكم".length;
+        const after = text.substring(start, start + 5);
+        if (after.match(/^[:\s]/)) start += after.match(/^[:\s]+/)![0].length;
+        return text.substring(start).trim();
+    }
+    // Look for "(الوقائع)" marker as fallback
+    const waqaeiIdx = text.indexOf("(الوقائع)");
+    if (waqaeiIdx !== -1 && waqaeiIdx < 600) {
+        return text.substring(waqaeiIdx).trim();
+    }
+    // Look for "الوقائع:" marker as fallback
+    const waqaeiColonMatch = text.substring(0, 600).match(/الوقائع\s*:/);
+    if (waqaeiColonMatch && waqaeiColonMatch.index !== undefined) {
+        return text.substring(waqaeiColonMatch.index).trim();
+    }
+    return text;
+}
+
+export function parseSaudiCaseInfo(text: string, source?: string): { label: string; value: string }[] | null {
+    if (!text || source !== "sa_judicial") return null;
+    const info: { label: string; value: string }[] = [];
+    // Extract from the header portion (first ~500 chars)
+    const header = text.substring(0, 600);
+
+    const caseNumMatch = header.match(/القضية\s+رقم\s+([^\s]+(?:\s+لعام\s+[^\s]+)?)/);
+    if (caseNumMatch) info.push({ label: "رقم القضية", value: caseNumMatch[1].replace(/لعام/, "لعام ") });
+
+    const judgmentNumMatch = header.match(/رقم الحكم:\s*([^\s]+)/);
+    if (judgmentNumMatch) info.push({ label: "رقم الحكم", value: judgmentNumMatch[1] });
+
+    const dateMatch = header.match(/التاريخ:\s*([^\n]+?)(?:\s+نص|\s*$)/);
+    if (dateMatch) info.push({ label: "تاريخ الحكم", value: dateMatch[1].trim() });
+
+    const cityMatch = header.match(/المدينة:\s*([^\s]+)/);
+    if (cityMatch) info.push({ label: "المدينة", value: cityMatch[1] });
+
+    return info.length > 0 ? info : null;
 }
 
 /**
