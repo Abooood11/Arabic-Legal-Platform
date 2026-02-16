@@ -1246,6 +1246,7 @@ export default function LawDetail() {
                                   text={text}
                                   articles={law.articles}
                                   currentArticleNumber={article.number}
+                                  isDefinitionContext={vp.dataLevel === 0 && !vp.marker}
                                 />
                               </div>
                             );

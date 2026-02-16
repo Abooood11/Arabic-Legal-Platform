@@ -16,6 +16,21 @@ interface ArticleReferenceTextProps {
   currentArticleNumber: number;
   nestingLevel?: number;
   maxNestingLevel?: number;
+  isDefinitionContext?: boolean;
+}
+
+/** Detect if text starts with a short definition term followed by `:`.
+ *  Returns { term, separator, rest } or null if not a definition pattern.
+ *  Guards: term ≤60 chars, rest is non-empty, colon is not at the very end. */
+function splitDefinitionTerm(text: string): { term: string; separator: string; rest: string } | null {
+  // Match first colon (possibly with surrounding spaces)
+  const match = text.match(/^([^:]+?)\s*(:)\s*/);
+  if (!match) return null;
+  const term = match[1].trim();
+  const afterColon = text.slice(match[0].length).trim();
+  // Term must be short (a defined term, not a full sentence) and rest must exist
+  if (term.length === 0 || term.length > 60 || afterColon.length === 0) return null;
+  return { term, separator: ' : ', rest: afterColon };
 }
 
 const arabicOrdinals: Record<string, number> = {
@@ -650,6 +665,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                         currentArticleNumber={article.number}
                         nestingLevel={nestingLevel + 1}
                         maxNestingLevel={maxNestingLevel}
+                        isDefinitionContext={vp.dataLevel === 0 && !vp.marker}
                       />
                     ) : (
                       toHindiNumerals(vp.text)
@@ -684,28 +700,49 @@ export function ArticleReferenceText({
   articles,
   currentArticleNumber,
   nestingLevel = 0,
-  maxNestingLevel = 2
+  maxNestingLevel = 2,
+  isDefinitionContext = false
 }: ArticleReferenceTextProps) {
   // Track expanded articles by article number only (not segment index) to avoid duplicates
   const [expandedArticles, setExpandedArticles] = useState<Record<number, boolean>>({});
-  
+
   const segments = useMemo(() => parseArticleReferences(text), [text]);
-  
+
   const toggleReference = useCallback((articleNumber: number) => {
     setExpandedArticles(prev => ({
       ...prev,
       [articleNumber]: !prev[articleNumber]
     }));
   }, []);
-  
+
   const getArticle = useCallback((articleNumber: number) => {
     return articles.find(a => a.number === articleNumber);
   }, [articles]);
-  
+
   const hasReferences = segments.some(s => s.type === 'reference');
-  
+
+  // Render the definition term (before colon) in green bold
+  const renderDefinitionTerm = (term: string, separator: string) => (
+    <>
+      <span className="text-primary font-bold">{toHindiNumerals(term)}</span>
+      <span>{separator}</span>
+    </>
+  );
+
   // Function to render text with line breaks
   const renderTextWithLineBreaks = (content: string) => {
+    // If definition context, highlight the term before the first colon
+    if (isDefinitionContext) {
+      const def = splitDefinitionTerm(content);
+      if (def) {
+        return (
+          <span>
+            {renderDefinitionTerm(def.term, def.separator)}
+            {toHindiNumerals(def.rest)}
+          </span>
+        );
+      }
+    }
     const parts = content.split(/\n+/);
     if (parts.length === 1) {
       return <span>{toHindiNumerals(content)}</span>;
@@ -721,7 +758,7 @@ export function ArticleReferenceText({
       </>
     );
   };
-  
+
   if (!hasReferences) {
     return renderTextWithLineBreaks(text);
   }
@@ -731,6 +768,18 @@ export function ArticleReferenceText({
       <span className="inline">
         {segments.map((segment, idx) => {
           if (segment.type === 'text') {
+            // For the first text segment in a definition context, highlight the term
+            if (isDefinitionContext && idx === 0) {
+              const def = splitDefinitionTerm(segment.content);
+              if (def) {
+                return (
+                  <span key={idx}>
+                    {renderDefinitionTerm(def.term, def.separator)}
+                    {toHindiNumerals(def.rest)}
+                  </span>
+                );
+              }
+            }
             // Handle line breaks in text segments
             const parts = segment.content.split(/\n+/);
             if (parts.length === 1) {
