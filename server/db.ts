@@ -422,7 +422,9 @@ try {
             created_at TEXT DEFAULT (datetime('now'))
         );
     `);
-    sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS af_fingerprint ON audit_findings(fingerprint);`);
+    // Unique per run — same finding can appear in different audit runs
+    try { sqlite.exec(`DROP INDEX IF EXISTS af_fingerprint;`); } catch {}
+    sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS af_run_fingerprint ON audit_findings(audit_run_id, fingerprint);`);
     sqlite.exec(`CREATE INDEX IF NOT EXISTS af_run_id ON audit_findings(audit_run_id);`);
     sqlite.exec(`CREATE INDEX IF NOT EXISTS af_severity ON audit_findings(severity);`);
     sqlite.exec(`CREATE INDEX IF NOT EXISTS af_category ON audit_findings(category);`);
