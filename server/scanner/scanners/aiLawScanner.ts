@@ -135,8 +135,12 @@ export async function runAiLawScan(context: AuditContext): Promise<ScanResult> {
 
     // Process batch
     if (lawBatch.length >= BATCH_SIZE) {
+      const batchNum = Math.ceil(itemsScanned / BATCH_SIZE);
+      const totalBatches = Math.ceil(MAX_LAWS / BATCH_SIZE);
+      console.log(`[Audit] AI Law batch ${batchNum}/${totalBatches} — processing ${lawBatch.length} laws (${itemsScanned}/${MAX_LAWS} scanned)`);
       const batchFindings = await processBatch(lawBatch, context);
       findings.push(...batchFindings);
+      console.log(`[Audit] AI Law batch ${batchNum} done — ${batchFindings.length} new findings (total: ${findings.length})`);
       lawBatch.length = 0;
 
       // Rate limit: wait 2 seconds between batches

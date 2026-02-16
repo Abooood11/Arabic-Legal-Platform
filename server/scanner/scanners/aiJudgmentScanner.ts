@@ -118,8 +118,12 @@ export async function runAiJudgmentScan(context: AuditContext): Promise<ScanResu
       });
 
       if (batch.length >= BATCH_SIZE) {
+        const batchNum = Math.ceil(itemsScanned / BATCH_SIZE);
+        const totalBatches = Math.ceil(MAX_JUDGMENTS / BATCH_SIZE);
+        console.log(`[Audit] AI Judgment batch ${batchNum}/${totalBatches} — processing ${batch.length} judgments (${itemsScanned}/${MAX_JUDGMENTS} scanned)`);
         const batchFindings = await processBatch(batch, context);
         findings.push(...batchFindings);
+        console.log(`[Audit] AI Judgment batch ${batchNum} done — ${batchFindings.length} new findings (total: ${findings.length})`);
         batch.length = 0;
         await new Promise((r) => setTimeout(r, 2000)); // rate limit
       }
