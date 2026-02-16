@@ -112,7 +112,14 @@ function useDebounce<T>(value: T, delay: number): T {
 function HighlightedSnippet({ text }: { text: string }) {
     if (!text) return <span className="text-muted-foreground">—</span>;
 
-    const parts = text.split(/(【[^】]+】)/g);
+    // Clean kashida/tatweel separator lines and decorative dashes
+    const cleaned = text
+        .replace(/ـ{3,}/g, ' ')
+        .replace(/-{3,}/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    const parts = cleaned.split(/(【[^】]+】)/g);
     return (
         <>
             {parts.map((part, i) => {

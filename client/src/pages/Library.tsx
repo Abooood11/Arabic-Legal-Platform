@@ -256,9 +256,11 @@ export default function Library() {
                             <Badge variant={item.category === "law" ? "default" : "secondary"}>
                               {CATEGORY_LABELS[item.category] || item.category}
                             </Badge>
-                            <Badge variant="outline" className="text-[11px] border-primary/30 text-primary">
-                              {FORM_LABELS[form] || FORM_LABELS.qarar}
-                            </Badge>
+                            {(FORM_LABELS[form] || FORM_LABELS.qarar) !== (CATEGORY_LABELS[item.category] || item.category) && (
+                              <Badge variant="outline" className="text-[11px] border-primary/30 text-primary">
+                                {FORM_LABELS[form] || FORM_LABELS.qarar}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <CardTitle className="mt-4 text-xl leading-snug group-hover:text-primary transition-colors">

@@ -218,6 +218,9 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
             .replace(/0[A-F][A-F0-9]/g, '')    // remaining inline hex artifacts
             .replace(/www\.\w+\.com/g, '')      // stray URLs
             .replace(/^-{3,}$/gm, '')           // horizontal rules (---)
+            .replace(/^\s*ـ{3,}\s*$/gm, '')    // kashida separator lines (ـــــــــ)
+            .replace(/^\s*[\-ـ]{5,}\s*$/gm, '') // mixed dash-kashida lines
+            .replace(/ـ{5,}/g, ' ')             // inline kashida separators → space
             .replace(/\n{3,}/g, '\n\n')         // collapse 3+ blank lines
             .replace(/هيئة التثقيف/g, 'هيئة التدقيق')  // OCR: التثقيف → التدقيق
             .replace(/هيئه التثقيف/g, 'هيئة التدقيق')
@@ -528,7 +531,7 @@ export default function JudgmentDetail() {
 
     const searchCount = useMemo(() => {
         if (!searchTerm || searchTerm.length < 2 || !judgment?.text) return 0;
-        const fullText = (judgment.principleText || "") + "\n" + judgment.text;
+        const fullText = judgment.text;
         const lower = fullText.toLowerCase();
         const searchLower = searchTerm.toLowerCase();
         let count = 0;
@@ -557,12 +560,8 @@ export default function JudgmentDetail() {
 
     const wordCount = useMemo(() => {
         if (!judgment?.text) return 0;
-        let total = judgment.text.split(/\s+/).filter(Boolean).length;
-        if (judgment.principleText) {
-            total += judgment.principleText.split(/\s+/).filter(Boolean).length;
-        }
-        return total;
-    }, [judgment?.text, judgment?.principleText]);
+        return judgment.text.split(/\s+/).filter(Boolean).length;
+    }, [judgment?.text]);
 
     const judges = useMemo(() => {
         if (!judgment?.text) return null;
@@ -658,7 +657,7 @@ export default function JudgmentDetail() {
                                 <TooltipContent>بحث (Ctrl+F)</TooltipContent>
                             </Tooltip>
                         )}
-                        <CopyButton text={judgment.principleText ? `المبدأ القضائي:\n${judgment.principleText}\n\nنص الحكم:\n${judgment.text}` : judgment.text} label="نسخ النص الكامل" />
+                        <CopyButton text={judgment.text} label="نسخ النص الكامل" />
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigator.clipboard.writeText(window.location.href)}>
@@ -741,33 +740,10 @@ export default function JudgmentDetail() {
                     <BogMetadataPanel meta={bogMeta} />
                 )}
 
-                {/* Egyptian Principle Text - separate section */}
-                {isEgyptian && judgment.principleText && (
-                    <div className="rounded-2xl bg-background border shadow-sm mb-5 overflow-hidden">
-                        <div className="bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-800 px-6 py-3 flex items-center gap-2">
-                            <Scale className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-                            <h2 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">المبدأ القضائي</h2>
-                        </div>
-                        <div className="p-6 sm:p-8">
-                            <div className="judgment-text leading-[1.75] whitespace-pre-line text-justify" dir="rtl">
-                                <HighlightedChunk
-                                    text={formatJudgmentText(judgment.principleText)}
-                                    tokens={findHighlightableTokens(formatJudgmentText(judgment.principleText))}
-                                    searchTerm={searchTerm}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Egyptian Principle Text - hidden (مشتتة للقارئ) */}
 
                 {/* Judgment Text */}
                 <div className="rounded-2xl bg-background border shadow-sm p-6 sm:p-8">
-                    {isEgyptian && judgment.principleText && (
-                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                            <Gavel className="h-4 w-4 text-amber-700" />
-                            <h2 className="text-sm font-bold text-amber-800 dark:text-amber-300">نص الحكم</h2>
-                        </div>
-                    )}
                     <JudgmentTextBody
                         text={bogMeta?.bodyText || (saudiCaseInfo ? stripSaudiHeader(judgment.text) : judgment.text)}
                         searchTerm={searchTerm}
