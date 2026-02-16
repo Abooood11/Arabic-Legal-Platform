@@ -1721,6 +1721,87 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================
+  // Pre-Launch Audit API
+  // ============================================
+
+  app.post("/api/admin/audit/run", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { startAudit, isAuditRunning } = await import("./scanner");
+      if (isAuditRunning()) {
+        return res.status(409).json({ message: "مراجعة قيد التشغيل بالفعل" });
+      }
+      const runId = await startAudit();
+      res.json({ success: true, runId });
+    } catch (error: any) {
+      console.error("Error starting audit:", error);
+      res.status(500).json({ message: error.message || "Failed to start audit" });
+    }
+  });
+
+  app.get("/api/admin/audit/status", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getLatestAuditRun } = await import("./scanner");
+      const run = getLatestAuditRun();
+      if (!run) {
+        return res.json({ run: null });
+      }
+      res.json({ run });
+    } catch (error) {
+      console.error("Error fetching audit status:", error);
+      res.status(500).json({ message: "Failed to fetch audit status" });
+    }
+  });
+
+  app.get("/api/admin/audit/findings", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getFindings, getLatestAuditRun } = await import("./scanner");
+      const run = getLatestAuditRun();
+      if (!run) {
+        return res.json({ findings: [], total: 0 });
+      }
+      const result = getFindings({
+        runId: run.id,
+        severity: req.query.severity as string,
+        category: req.query.category as string,
+        status: req.query.status as string,
+        entityType: req.query.entityType as string,
+        page: parseInt(req.query.page as string) || 1,
+        limit: parseInt(req.query.limit as string) || 50,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching audit findings:", error);
+      res.status(500).json({ message: "Failed to fetch findings" });
+    }
+  });
+
+  app.patch("/api/admin/audit/findings/:id/status", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { updateFindingStatus } = await import("./scanner");
+      const { status } = req.body;
+      if (!["open", "acknowledged", "resolved", "wont_fix"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const success = updateFindingStatus(parseInt(req.params.id), status);
+      res.json({ success });
+    } catch (error) {
+      console.error("Error updating finding status:", error);
+      res.status(500).json({ message: "Failed to update finding status" });
+    }
+  });
+
+  app.get("/api/admin/audit/stats", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getAuditStats } = await import("./scanner");
+      const stats = getAuditStats();
+      res.json({ stats });
+    } catch (error) {
+      console.error("Error fetching audit stats:", error);
+      res.status(500).json({ message: "Failed to fetch audit stats" });
+    }
+  });
+
   app.patch("/api/error-reports/:id/resolve", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { id } = req.params;

@@ -166,6 +166,7 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">متابعة تشغيلية ومؤشرات أداء للنمو</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/admin/audit"><Button variant="default">المراجعة الشاملة</Button></Link>
           <Link href="/admin/reports"><Button variant="outline">بلاغات الأخطاء</Button></Link>
         </div>
       </div>

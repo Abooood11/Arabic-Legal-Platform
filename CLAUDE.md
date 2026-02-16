@@ -27,6 +27,7 @@
 
 | التاريخ | الملخص |
 |---------|--------|
+| 2026-02-16 | نظام المراجعة الشاملة الذكية (Pre-Launch Audit) بـ Gemini AI + 6 ماسحات + لوحة تحكم |
 | 2026-02-16 | تمييز المُعرَّفات القانونية بلون أخضر داكن (isDefinitionContext prop) |
 | 2026-02-16 | إصلاح تكرار badge "نظام" في المكتبة + إزالة خطوط الكشيدة من الأحكام المصرية |
 | 2026-02-16 | إخفاء قسم المبدأ القضائي للأحكام المصرية (مشتت للقارئ) |
@@ -105,6 +106,10 @@ server/routes.ts                        — كل API endpoints
 server/db.ts                            — SQLite + indexes + facets cache
 server/authSystem.ts                    — مصادقة Google OAuth + JWT + admin roles
 client/public/data/laws/                — ملفات JSON للأنظمة (3,907 نظام)
+server/scanner/                         — نظام المراجعة الشاملة (Gemini AI + 6 ماسحات)
+server/scanner/runAudit.ts             — منسق المراجعة (pipeline + context تعلمي)
+server/scanner/geminiClient.ts         — عميل Google Gemini API
+client/src/pages/AuditResults.tsx      — صفحة نتائج المراجعة (بث مباشر + فلاتر)
 scripts/extract_folder1_laws.py         — استخراج أنظمة BOE
 ```
 
@@ -143,6 +148,7 @@ scripts/extract_folder1_laws.py         — استخراج أنظمة BOE
 | `AI_INTEGRATIONS_OPENAI_API_KEY` | OpenAI API |
 | `AI_INTEGRATIONS_OPENAI_BASE_URL` | OpenAI base URL |
 | `NODE_ENV` | development / production |
+| `GEMINI_API_KEY` | Google AI Studio (للمراجعة الشاملة) |
 
 ---
 

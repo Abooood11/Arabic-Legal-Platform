@@ -380,4 +380,56 @@ try {
     console.warn("CRSD principles setup:", e.message);
 }
 
+// ============================================
+// Audit System Tables (Pre-Launch Review)
+// ============================================
+try {
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS audit_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            started_at TEXT DEFAULT (datetime('now')),
+            finished_at TEXT,
+            status TEXT DEFAULT 'running',
+            total_laws_scanned INTEGER DEFAULT 0,
+            total_judgments_scanned INTEGER DEFAULT 0,
+            total_findings INTEGER DEFAULT 0,
+            critical_count INTEGER DEFAULT 0,
+            high_count INTEGER DEFAULT 0,
+            medium_count INTEGER DEFAULT 0,
+            low_count INTEGER DEFAULT 0,
+            progress_pct INTEGER DEFAULT 0,
+            current_step TEXT,
+            error_message TEXT,
+            context TEXT,
+            summary TEXT
+        );
+    `);
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS audit_findings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            audit_run_id INTEGER REFERENCES audit_runs(id),
+            severity TEXT NOT NULL,
+            code TEXT NOT NULL,
+            category TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            entity_name TEXT,
+            message TEXT NOT NULL,
+            location TEXT,
+            details TEXT,
+            fingerprint TEXT NOT NULL,
+            status TEXT DEFAULT 'open',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+    `);
+    sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS af_fingerprint ON audit_findings(fingerprint);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS af_run_id ON audit_findings(audit_run_id);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS af_severity ON audit_findings(severity);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS af_category ON audit_findings(category);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS af_status ON audit_findings(status);`);
+    console.log("Audit system tables ready.");
+} catch (e: any) {
+    console.warn("Audit tables setup:", e.message);
+}
+
 console.log(`Database connected: ${dbPath}`);

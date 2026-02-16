@@ -19,6 +19,7 @@ import Regulations from "@/pages/Regulations";
 import UnifiedSearch from "@/pages/UnifiedSearch";
 import AuthPortal from "@/pages/AuthPortal";
 import AdminDashboard from "@/pages/AdminDashboard";
+import AuditResults from "@/pages/AuditResults";
 
 // Scroll to top on every route change (fixes mobile not starting at top)
 function ScrollToTop() {
@@ -63,6 +64,7 @@ function Router() {
         <Route path="/law/:id" component={LawDetail} />
         <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
         <Route path="/admin/reports">{() => <AdminRoute component={ErrorReports} />}</Route>
+        <Route path="/admin/audit">{() => <AdminRoute component={AuditResults} />}</Route>
         <Route component={NotFound} />
       </Switch>
     </>
