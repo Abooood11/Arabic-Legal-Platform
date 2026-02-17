@@ -1,6 +1,6 @@
 // Onboarding: see /docs/onboarding (VISION, DOMAIN, ARCHITECTURE, DATA_CONTRACTS, DEBUG_PLAYBOOK)
-import { useState, useMemo, useCallback } from "react";
-import { X } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { X, ExternalLink } from "lucide-react";
 import { NumberedItem } from "./NumberedItem";
 
 interface Article {
@@ -158,10 +158,11 @@ function toHindiNumerals(text: string): string {
 }
 
 interface ParsedSegment {
-  type: 'text' | 'reference';
+  type: 'text' | 'reference' | 'external_reference';
   content: string;
   articleNumber?: number;
   hasParentheses?: boolean;
+  externalLawName?: string;  // For external references: the law name mentioned in text
 }
 
 // Base trigger words for article references
@@ -228,6 +229,17 @@ const NON_ARTICLE_FOLLOWERS = new Set([
   'الغذائية', 'الدوائية', 'المخدرة', 'المحظورة', 'الأولية', 'النقية',
   'البيضاء', 'السوداء', 'الرمادية', 'الصلبة', 'السائلة', 'الغازية',
 ]);
+
+// Regex to detect external law references AFTER the article number.
+// Matches: "من نظام X" / "من لائحة X" / "من تنظيم X" / "من قانون X" / "من مرسوم X" / "من قرار X"
+// Does NOT match: "من هذا النظام" / "من هذه اللائحة" (self-references to current law → keep link)
+// Also matches: "من النظام" / "من اللائحة" (definite form, refers to a specific external law mentioned in context)
+// Regex to detect external law references AFTER the article number.
+// Captures the full law name: "من نظام المعالجات التجارية في التجارة الدولية" → "نظام المعالجات التجارية في التجارة الدولية"
+// The law name extends until a sentence boundary (comma, period, etc.) or end of text.
+const EXTERNAL_LAW_KEYWORDS = 'نظام|لائحة|تنظيم|قانون|مرسوم|قرار|النظام|اللائحة|التنظيم|القانون|المرسوم|القرار';
+const EXTERNAL_LAW_PATTERN = new RegExp(`^\\s+من\\s+((?:${EXTERNAL_LAW_KEYWORDS})(?:\\s+[^،,؛;.!؟?\\n]+)?)`);
+const SELF_REFERENCE_PATTERN = /^\s+من\s+هذ[اه]\s+(النظام|اللائحة|التنظيم|القانون|المرسوم|القرار)/;
 
 // Parse article cross-references (المادة الخامسة، المادتين...) into clickable segments.
 // See: docs/extraction/boe_formatting_playbook.md (sections C, E)
@@ -301,6 +313,26 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
         }
 
         if (anyValid) {
+          // Check for external law reference after the parenthetical group
+          const afterMultiParen = text.slice(afterTrigger + parenMatch[0].length);
+          const isMultiSelfRef = SELF_REFERENCE_PATTERN.test(afterMultiParen);
+          const isMultiExternalRef = !isMultiSelfRef && EXTERNAL_LAW_PATTERN.test(afterMultiParen);
+
+          if (isMultiExternalRef) {
+            const multiExternalMatch = afterMultiParen.match(EXTERNAL_LAW_PATTERN);
+            const multiExternalLawName = multiExternalMatch ? multiExternalMatch[1].trim() : '';
+            const fullMultiRefText = triggerWord + parenMatch[0];
+            const multiFromText = multiExternalMatch ? multiExternalMatch[0] : '';
+            segments.push({
+              type: 'external_reference',
+              content: fullMultiRefText + multiFromText,
+              externalLawName: multiExternalLawName
+            });
+            currentIndex = afterTrigger + parenMatch[0].length + multiFromText.length;
+            triggerPattern.lastIndex = currentIndex;
+            continue;
+          }
+
           segments.push({ type: 'text', content: triggerWord + whitespace + '(' });
           segments.push(...tempSegments);
           segments.push({ type: 'text', content: ')' });
@@ -312,8 +344,31 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
       } else {
         const articleNumber = parseArabicArticleNumber(refContent);
 
+        // Check for external law reference first (before internal validation)
+        if (articleNumber) {
+          const afterParen = text.slice(afterTrigger + parenMatch[0].length);
+          const isParenSelfRef = SELF_REFERENCE_PATTERN.test(afterParen);
+          const isParenExternalRef = !isParenSelfRef && EXTERNAL_LAW_PATTERN.test(afterParen);
+
+          if (isParenExternalRef) {
+            const parenExternalMatch = afterParen.match(EXTERNAL_LAW_PATTERN);
+            const parenExternalLawName = parenExternalMatch ? parenExternalMatch[1].trim() : '';
+            const fullParenRefText = triggerWord + parenMatch[0];
+            const parenFromText = parenExternalMatch ? parenExternalMatch[0] : '';
+            segments.push({
+              type: 'external_reference',
+              content: fullParenRefText + parenFromText,
+              articleNumber,
+              externalLawName: parenExternalLawName
+            });
+            currentIndex = afterTrigger + parenMatch[0].length + parenFromText.length;
+            triggerPattern.lastIndex = currentIndex;
+            continue;
+          }
+        }
+
         if (articleNumber && validArticleNumbers.has(articleNumber)) {
-          // Valid single parenthetical reference
+          // Valid single parenthetical reference (internal)
           segments.push({ type: 'text', content: triggerWord + whitespace });
           segments.push({
             type: 'reference',
@@ -384,7 +439,33 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
             break; // No longer matches, stop extending
           }
         }
-        // Phase 2: Validate the longest matched number against this law's articles
+        // Phase 2: Check for EXTERNAL law reference first (must happen before internal validation!)
+        // "المادة الرابعة من نظام المعالجات التجارية" should link to external law regardless of whether
+        // article 4 exists in the current law or not.
+        if (bestParsed !== null) {
+          const afterNumber = text.slice(afterTrigger + whitespace.length + bestNumberText.length);
+          const isSelfRef = SELF_REFERENCE_PATTERN.test(afterNumber);
+          const isExternalRef = !isSelfRef && EXTERNAL_LAW_PATTERN.test(afterNumber);
+
+          if (isExternalRef) {
+            // External law reference — create a special segment with the external law name
+            const externalMatch = afterNumber.match(EXTERNAL_LAW_PATTERN);
+            const externalLawName = externalMatch ? externalMatch[1].trim() : '';
+            const fullRefText = triggerWord + whitespace + bestNumberText;
+            const fromText = externalMatch ? externalMatch[0] : '';
+            segments.push({
+              type: 'external_reference',
+              content: fullRefText + fromText,
+              articleNumber: bestParsed,
+              externalLawName
+            });
+            currentIndex = afterTrigger + whitespace.length + bestNumberText.length + fromText.length;
+            triggerPattern.lastIndex = currentIndex;
+            continue;
+          }
+        }
+
+        // Phase 3: Validate the longest matched number against this law's articles (internal reference)
         let articleNumber: number | null = null;
         let numberText = "";
         if (bestParsed !== null && validArticleNumbers.has(bestParsed)) {
@@ -393,7 +474,6 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
         }
 
         if (articleNumber && numberText) {
-
           segments.push({ type: 'text', content: triggerWord + whitespace });
           segments.push({
             type: 'reference',
@@ -489,6 +569,69 @@ function extractNumberText(candidateText: string, targetNumber: number): string 
   }
 
   return lastMatch || candidateText;
+}
+
+// ============================================
+// Library cache for external law name → ID lookup
+// ============================================
+interface LibraryCacheEntry {
+  id: string;
+  title_ar: string;
+}
+
+// Module-level cache: loaded once, shared across all ArticleReferenceText instances
+let libraryCache: LibraryCacheEntry[] | null = null;
+let libraryCachePromise: Promise<LibraryCacheEntry[]> | null = null;
+
+function loadLibraryCache(): Promise<LibraryCacheEntry[]> {
+  if (libraryCache) return Promise.resolve(libraryCache);
+  if (libraryCachePromise) return libraryCachePromise;
+
+  libraryCachePromise = fetch('/api/library')
+    .then(res => res.json())
+    .then((items: any[]) => {
+      libraryCache = items.map(item => ({
+        id: item.id,
+        title_ar: item.title_ar || ''
+      }));
+      return libraryCache;
+    })
+    .catch(() => {
+      libraryCachePromise = null;
+      return [] as LibraryCacheEntry[];
+    });
+
+  return libraryCachePromise;
+}
+
+/** Find a law by matching its name against the library.
+ *  Uses fuzzy matching: the referenced name must be a substring of or contain the library title. */
+function findLawByName(name: string, cache: LibraryCacheEntry[]): LibraryCacheEntry | null {
+  if (!name || !cache.length) return null;
+
+  // Normalize: remove "ال" prefix variations from type words for better matching
+  const normalized = name.trim();
+
+  // 1. Exact match on title
+  const exact = cache.find(c => c.title_ar === normalized);
+  if (exact) return exact;
+
+  // 2. Library title contains the referenced name (e.g. title="نظام المعالجات التجارية في التجارة الدولية" contains "نظام المعالجات التجارية")
+  const contained = cache.find(c => c.title_ar.includes(normalized));
+  if (contained) return contained;
+
+  // 3. Referenced name contains library title (e.g. "نظام المعالجات التجارية في التجارة الدولية" contains title="نظام المعالجات التجارية")
+  const containing = cache.find(c => normalized.includes(c.title_ar) && c.title_ar.length > 10);
+  if (containing) return containing;
+
+  // 4. Try without the type prefix: "نظام المعالجات التجارية" → "المعالجات التجارية"
+  const withoutType = normalized.replace(/^(نظام|لائحة|تنظيم|قانون|مرسوم|قرار|النظام|اللائحة|التنظيم|القانون|المرسوم|القرار)\s+/, '');
+  if (withoutType !== normalized) {
+    const byContent = cache.find(c => c.title_ar.includes(withoutType) && withoutType.length > 5);
+    if (byContent) return byContent;
+  }
+
+  return null;
 }
 
 interface ExpandedArticlePanelProps {
@@ -728,10 +871,21 @@ export function ArticleReferenceText({
   // Track expanded articles by article number only (not segment index) to avoid duplicates
   const [expandedArticles, setExpandedArticles] = useState<Record<number, boolean>>({});
 
+  // Library cache for external law lookups
+  const [libCache, setLibCache] = useState<LibraryCacheEntry[]>(libraryCache || []);
+
   // Build a Set of valid article numbers from the actual articles in this law
   const validArticleNumbers = useMemo(() => new Set(articles.map(a => a.number)), [articles]);
 
   const segments = useMemo(() => parseArticleReferences(text, validArticleNumbers), [text, validArticleNumbers]);
+
+  // Load library cache on first render if we have external references
+  const hasExternalRefs = segments.some(s => s.type === 'external_reference');
+  useEffect(() => {
+    if (hasExternalRefs && !libraryCache) {
+      loadLibraryCache().then(cache => setLibCache(cache));
+    }
+  }, [hasExternalRefs]);
 
   const toggleReference = useCallback((articleNumber: number) => {
     setExpandedArticles(prev => ({
@@ -744,7 +898,7 @@ export function ArticleReferenceText({
     return articles.find(a => a.number === articleNumber);
   }, [articles]);
 
-  const hasReferences = segments.some(s => s.type === 'reference');
+  const hasReferences = segments.some(s => s.type === 'reference' || s.type === 'external_reference');
 
   // Render the definition term (before colon) in green bold
   const renderDefinitionTerm = (term: string, separator: string) => (
@@ -822,15 +976,38 @@ export function ArticleReferenceText({
             );
           }
           
+          // External law reference — show as link to external law page
+          if (segment.type === 'external_reference') {
+            const externalLaw = segment.externalLawName ? findLawByName(segment.externalLawName, libCache) : null;
+            if (externalLaw) {
+              // Found the external law — create a link to it
+              const articleParam = segment.articleNumber ? `#article-${segment.articleNumber}` : '';
+              return (
+                <a
+                  key={idx}
+                  href={`/law/${externalLaw.id}${articleParam}`}
+                  className="text-blue-600 dark:text-blue-400 font-semibold underline decoration-blue-400/30 underline-offset-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all inline-flex items-center gap-1"
+                  style={{ display: 'inline' }}
+                  title={`الانتقال إلى ${externalLaw.title_ar}`}
+                >
+                  {toHindiNumerals(segment.content)}
+                  <ExternalLink className="w-3 h-3 inline-block opacity-50" />
+                </a>
+              );
+            }
+            // External law not found in library — show as plain text (no wrong link)
+            return <span key={idx}>{toHindiNumerals(segment.content)}</span>;
+          }
+
           const articleNumber = segment.articleNumber!;
           const isExpanded = !!expandedArticles[articleNumber];
           const referencedArticle = getArticle(articleNumber);
           const isSelfReference = articleNumber === currentArticleNumber;
-          
+
           if (isSelfReference || !referencedArticle) {
             return <span key={idx}>{toHindiNumerals(segment.content)}</span>;
           }
-          
+
           const clickableRef = (
             <span
               onClick={() => toggleReference(articleNumber)}
@@ -839,7 +1016,7 @@ export function ArticleReferenceText({
                 hover:bg-primary/5 transition-all cursor-pointer
                 ${isExpanded ? 'bg-primary/10 decoration-primary' : ''}
               `}
-              style={{ 
+              style={{
                 cursor: 'pointer',
                 display: 'inline',
                 letterSpacing: 0,
@@ -853,7 +1030,7 @@ export function ArticleReferenceText({
               {toHindiNumerals(segment.content)}
             </span>
           );
-          
+
           if (segment.hasParentheses) {
             return (
               <span key={idx}>
@@ -861,7 +1038,7 @@ export function ArticleReferenceText({
               </span>
             );
           }
-          
+
           return <span key={idx}>{clickableRef}</span>;
         })}
       </span>
