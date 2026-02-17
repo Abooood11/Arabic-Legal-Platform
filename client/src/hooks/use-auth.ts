@@ -41,6 +41,9 @@ export function useAuth() {
     queryFn: fetchUser,
     retry: false,
     staleTime: 1000 * 60 * 5,
+    // Refetch periodically to auto-refresh tokens via middleware
+    refetchInterval: 1000 * 60 * 10, // every 10 minutes
+    refetchOnWindowFocus: true,
   });
 
   const logoutMutation = useMutation({

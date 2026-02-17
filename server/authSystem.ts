@@ -6,8 +6,70 @@ const ACCESS_COOKIE = "alp_access";
 const REFRESH_COOKIE = "alp_refresh";
 const ACCESS_TTL_SECONDS = 15 * 60;
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+// Fail-fast: require a strong JWT secret in production
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || "dev-change-me";
+if (process.env.NODE_ENV === "production" && JWT_SECRET === "dev-change-me") {
+  console.error("FATAL: AUTH_JWT_SECRET must be set in production. Exiting.");
+  process.exit(1);
+}
+
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((v) => v.trim().toLowerCase()).filter(Boolean);
+
+// ── Rate Limiting (in-memory, per IP+email) ──────────────────────────
+const loginAttempts = new Map<string, { count: number; firstAt: number; lockedUntil: number }>();
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_ATTEMPTS = 10;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lockout
+
+function checkRateLimit(key: string): { allowed: boolean; retryAfterSec?: number } {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+
+  if (!entry) return { allowed: true };
+
+  // Check lockout
+  if (entry.lockedUntil > now) {
+    return { allowed: false, retryAfterSec: Math.ceil((entry.lockedUntil - now) / 1000) };
+  }
+
+  // Reset if window expired
+  if (now - entry.firstAt > RATE_LIMIT_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return { allowed: true };
+  }
+
+  if (entry.count >= MAX_ATTEMPTS) {
+    entry.lockedUntil = now + LOCKOUT_DURATION_MS;
+    return { allowed: false, retryAfterSec: Math.ceil(LOCKOUT_DURATION_MS / 1000) };
+  }
+
+  return { allowed: true };
+}
+
+function recordFailedAttempt(key: string) {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.firstAt > RATE_LIMIT_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, firstAt: now, lockedUntil: 0 });
+  } else {
+    entry.count++;
+  }
+}
+
+function clearAttempts(key: string) {
+  loginAttempts.delete(key);
+}
+
+// Cleanup stale entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  loginAttempts.forEach((entry, key) => {
+    if (now - entry.firstAt > RATE_LIMIT_WINDOW_MS && entry.lockedUntil < now) {
+      loginAttempts.delete(key);
+    }
+  });
+}, 30 * 60 * 1000);
 
 function nowUnix() {
   return Math.floor(Date.now() / 1000);
@@ -159,21 +221,67 @@ function getCurrentUser(req: Request) {
   const cookies = parseCookies(req);
   const payload = verifyJwt(cookies[ACCESS_COOKIE]);
   if (!payload?.sub) return null;
+  return getCurrentUserById(payload.sub, payload.sid);
+}
+
+function getCurrentUserById(userId: string, sid?: string) {
   const row = sqlite.prepare(`
-    SELECT u.id, u.email, u.first_name as firstName, u.last_name as lastName, a.role, a.subscription_tier as subscriptionTier,
-      a.subscription_status as subscriptionStatus, a.mfa_enabled as mfaEnabled
+    SELECT u.id, u.email, u.first_name as firstName, u.last_name as lastName, a.role, a.status,
+      a.subscription_tier as subscriptionTier, a.subscription_status as subscriptionStatus, a.mfa_enabled as mfaEnabled
     FROM users u
     JOIN app_users a ON a.user_id = u.id
-    WHERE u.id = ?
-  `).get(payload.sub) as any;
+    WHERE u.id = ? AND a.status = 'active'
+  `).get(userId) as any;
   if (!row) return null;
-  return { ...row, sid: payload.sid };
+  return { ...row, sid };
 }
 
 export const isAuthenticated: RequestHandler = (req, res, next) => {
   const user = getCurrentUser(req);
-  if (!user) return res.status(401).json({ message: "Unauthorized" });
-  (req as any).user = { claims: { sub: user.id }, role: user.role, profile: user };
+  if (user) {
+    (req as any).user = { claims: { sub: user.id }, role: user.role, profile: user };
+    return next();
+  }
+
+  // Try refresh token if access token expired/missing
+  const cookies = parseCookies(req);
+  const refreshToken = cookies[REFRESH_COOKIE];
+  if (!refreshToken) return res.status(401).json({ message: "Unauthorized" });
+
+  const refreshHash = hashToken(refreshToken);
+  const session = sqlite.prepare(`
+    SELECT s.id, s.user_id, u.email, a.role, a.status FROM auth_sessions s
+    JOIN users u ON u.id = s.user_id
+    JOIN app_users a ON a.user_id = s.user_id
+    WHERE s.refresh_token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > datetime('now')
+  `).get(refreshHash) as any;
+
+  if (!session || session.status !== "active") {
+    clearCookie(res, ACCESS_COOKIE);
+    clearCookie(res, REFRESH_COOKIE);
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Rotate refresh token
+  const newRefreshToken = randomToken();
+  const newRefreshHash = hashToken(newRefreshToken);
+  const newExpiresAt = new Date(Date.now() + REFRESH_TTL_SECONDS * 1000).toISOString();
+
+  sqlite.prepare("UPDATE auth_sessions SET revoked_at = datetime('now') WHERE id = ?").run(session.id);
+  const newSessionId = crypto.randomUUID();
+  sqlite.prepare(`
+    INSERT INTO auth_sessions (id, user_id, refresh_token_hash, user_agent, ip_address, expires_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(newSessionId, session.user_id, newRefreshHash, (req.headers["user-agent"] as string) || null, req.ip || null, newExpiresAt);
+
+  const access = signJwt({ sub: session.user_id, role: session.role, sid: newSessionId }, ACCESS_TTL_SECONDS);
+  setCookie(res, ACCESS_COOKIE, access, ACCESS_TTL_SECONDS);
+  setCookie(res, REFRESH_COOKIE, newRefreshToken, REFRESH_TTL_SECONDS);
+
+  const refreshedUser = getCurrentUserById(session.user_id, newSessionId);
+  if (!refreshedUser) return res.status(401).json({ message: "Unauthorized" });
+
+  (req as any).user = { claims: { sub: refreshedUser.id }, role: refreshedUser.role, profile: refreshedUser };
   next();
 };
 
@@ -282,13 +390,23 @@ export function registerAuthRoutes(app: Express) {
     const firstName = String(req.body?.firstName || "").trim();
     const lastName = String(req.body?.lastName || "").trim();
 
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: "Invalid email" });
+    // Rate limiting on register
+    const rateLimitKey = `reg:${req.ip}`;
+    const rateCheck = checkRateLimit(rateLimitKey);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({ message: "تم تجاوز عدد المحاولات. حاول مرة أخرى لاحقاً" });
+    }
+
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: "البريد الإلكتروني غير صالح" });
     if (password.length < 10 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-      return res.status(400).json({ message: "Password must be at least 10 chars and include uppercase, lowercase, number, and symbol" });
+      return res.status(400).json({ message: "كلمة المرور يجب أن تكون 10 أحرف على الأقل وتتضمن حرفاً كبيراً وصغيراً ورقماً ورمزاً" });
     }
 
     const exists = sqlite.prepare("SELECT id FROM users WHERE email = ?").get(email);
-    if (exists) return res.status(409).json({ message: "Email already registered" });
+    if (exists) {
+      recordFailedAttempt(rateLimitKey);
+      return res.status(409).json({ message: "البريد الإلكتروني مسجل مسبقاً" });
+    }
 
     const userId = crypto.randomUUID();
     const { hash, salt } = hashPassword(password);
@@ -309,24 +427,48 @@ export function registerAuthRoutes(app: Express) {
     const password = String(req.body?.password || "");
     const totpCode = String(req.body?.totpCode || "").trim();
 
+    // Rate limiting
+    const rateLimitKey = `${req.ip}:${email}`;
+    const rateCheck = checkRateLimit(rateLimitKey);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        message: `تم تجاوز عدد المحاولات المسموح. حاول مرة أخرى بعد ${Math.ceil((rateCheck.retryAfterSec || 900) / 60)} دقيقة`,
+        retryAfterSec: rateCheck.retryAfterSec,
+      });
+    }
+
     const row = sqlite.prepare(`
       SELECT u.id, u.email, u.first_name as firstName, u.last_name as lastName,
-             a.password_hash as passwordHash, a.password_salt as passwordSalt, a.role,
+             a.password_hash as passwordHash, a.password_salt as passwordSalt, a.role, a.status,
              a.mfa_enabled as mfaEnabled, a.mfa_secret as mfaSecret,
              a.subscription_tier as subscriptionTier, a.subscription_status as subscriptionStatus
       FROM users u JOIN app_users a ON a.user_id = u.id WHERE u.email = ?
     `).get(email) as any;
 
     if (!row || !verifyPassword(password, row.passwordSalt, row.passwordHash)) {
+      recordFailedAttempt(rateLimitKey);
       sqlite.prepare("INSERT INTO login_audit_logs (email, action, success, ip_address, user_agent) VALUES (?, 'login', 0, ?, ?)")
         .run(email || null, req.ip || null, (req.headers["user-agent"] as string) || null);
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
     }
 
-    if (row.mfaEnabled && !verifyTotp(row.mfaSecret, totpCode)) {
-      return res.status(401).json({ message: "MFA code required or invalid", mfaRequired: true });
+    // Check account status
+    if (row.status !== "active") {
+      return res.status(403).json({ message: "الحساب موقوف. تواصل مع الدعم الفني." });
     }
 
+    // MFA check — return mfaRequired so frontend can show TOTP input
+    if (row.mfaEnabled) {
+      if (!totpCode) {
+        return res.status(200).json({ mfaRequired: true, message: "أدخل رمز المصادقة الثنائية" });
+      }
+      if (!verifyTotp(row.mfaSecret, totpCode)) {
+        recordFailedAttempt(rateLimitKey);
+        return res.status(401).json({ message: "رمز المصادقة الثنائية غير صحيح", mfaRequired: true });
+      }
+    }
+
+    clearAttempts(rateLimitKey);
     sqlite.prepare("UPDATE app_users SET last_login_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ?").run(row.id);
     sqlite.prepare("INSERT INTO login_audit_logs (email, user_id, action, success, ip_address, user_agent) VALUES (?, ?, 'login', 1, ?, ?)")
       .run(email, row.id, req.ip || null, (req.headers["user-agent"] as string) || null);
