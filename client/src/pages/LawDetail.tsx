@@ -544,7 +544,7 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
       )}
       <div className="article-container">
         <div className="article-text-wrapper">
-          <div className="prose-law space-y-2">
+          <div className="prose-law">
             {allParagraphs.map((para, idx) => {
               let { text, marker, level, articleNumber } = para;
 
@@ -560,24 +560,27 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
 
               if (marker) {
                 return (
-                  <NumberedItem key={idx} marker={marker} level={level}>
-                    <ArticleReferenceText
-                      text={text}
-                      articles={allArticles}
-                      currentArticleNumber={articleNumber}
-                    />
-                  </NumberedItem>
+                  <div key={idx} className="mt-3">
+                    <NumberedItem marker={marker} level={level}>
+                      <ArticleReferenceText
+                        text={text}
+                        articles={allArticles}
+                        currentArticleNumber={articleNumber}
+                      />
+                    </NumberedItem>
+                  </div>
                 );
               }
 
               return (
-                <p key={idx} className="text-justify">
+                <span key={idx} className="text-justify">
                   <ArticleReferenceText
                     text={text}
                     articles={allArticles}
                     currentArticleNumber={articleNumber}
                   />
-                </p>
+                  {' '}
+                </span>
               );
             })}
           </div>
