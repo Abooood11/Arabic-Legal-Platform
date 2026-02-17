@@ -387,6 +387,10 @@ export function registerAuthRoutes(app: Express) {
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 
   function getGoogleRedirectUri(req: Request) {
+    // Use SITE_URL env var if set (recommended for production behind reverse proxy)
+    if (process.env.SITE_URL) {
+      return `${process.env.SITE_URL.replace(/\/$/, "")}/api/auth/google/callback`;
+    }
     const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
     const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost:3005";
     return `${proto}://${host}/api/auth/google/callback`;
