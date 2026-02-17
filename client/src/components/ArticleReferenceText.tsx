@@ -480,7 +480,7 @@ interface ExpandedArticlePanelProps {
 function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel, onClose }: ExpandedArticlePanelProps) {
   return (
     <div 
-      className="mt-4 mb-6 bg-slate-50 dark:bg-slate-900/50 border-r-4 border-primary/40 rounded-md p-5 shadow-sm animate-in slide-in-from-top-2 duration-300 ring-1 ring-slate-200 dark:ring-slate-800"
+      className="mt-2 mb-3 bg-slate-50 dark:bg-slate-900/50 border-r-4 border-primary/40 rounded-md p-4 shadow-sm animate-in slide-in-from-top-2 duration-300 ring-1 ring-slate-200 dark:ring-slate-800"
       style={{ direction: 'rtl' }}
     >
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -657,7 +657,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                 const contIndent = prevMarkerLevel >= 2 ? 88 : prevMarkerLevel >= 1 ? 58 : prevMarkerLevel === 0 ? 28 : 0;
 
                 return (
-                  <div key={idx} style={{ marginInlineStart: `${contIndent}px`, whiteSpace: 'pre-wrap' }}>
+                  <div key={idx} style={{ marginInlineStart: `${contIndent}px` }}>
                     {nestingLevel < maxNestingLevel ? (
                       <ArticleReferenceText
                         text={vp.text}
@@ -752,7 +752,7 @@ export function ArticleReferenceText({
         {parts.map((part, i) => (
           <span key={i}>
             {toHindiNumerals(part)}
-            {i < parts.length - 1 && <><br /><br /></>}
+            {i < parts.length - 1 && <br />}
           </span>
         ))}
       </>
@@ -790,7 +790,7 @@ export function ArticleReferenceText({
                 {parts.map((part, i) => (
                   <span key={i}>
                     {toHindiNumerals(part)}
-                    {i < parts.length - 1 && <><br /><br /></>}
+                    {i < parts.length - 1 && <br />}
                   </span>
                 ))}
               </span>

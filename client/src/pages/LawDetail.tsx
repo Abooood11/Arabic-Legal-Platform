@@ -380,7 +380,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
           </div>
 
           {/* Royal Decree Articles */}
-          <div className="space-y-6 pr-4">
+          <div className="space-y-4 pr-4">
             {royalDecree.articles.map((article, idx) => (
               <div key={idx} className="space-y-3">
                 {/* Main article marker (أولاً، ثانياً، etc.) */}
@@ -455,7 +455,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
               )}
               {/* Provisions (بنود القرار) */}
               {cabinetDecision.provisions && Array.isArray(cabinetDecision.provisions) && (
-                <div className="space-y-6 pr-4">
+                <div className="space-y-4 pr-4">
                   {cabinetDecision.provisions.map((provision: any, idx: number) => (
                     <div key={idx} className="space-y-3">
                       <div className="flex gap-1.5 items-start">
@@ -507,7 +507,7 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
 type OverridesMap = Record<string, { overrideText: string; updatedAt: string; updatedBy: string }>;
 
 // Regex to detect Arabic ordinal markers at the start of text: أولاً: ثانياً: etc.
-const ORDINAL_REGEX = /^(أولاً|ثانياً|ثالثاً|رابعاً|خامساً|سادساً|سابعاً|ثامناً|تاسعاً|عاشراً|حادي عشر|ثاني عشر|ثالث عشر|رابع عشر|خامس عشر)\s*[:\u200F]/;
+const ORDINAL_REGEX = /^(أولاً|أولًا|ثانياً|ثانيًا|ثالثاً|ثالثًا|رابعاً|رابعًا|خامساً|خامسًا|سادساً|سادسًا|سابعاً|سابعًا|ثامناً|ثامنًا|تاسعاً|تاسعًا|عاشراً|عاشرًا|حادي عشر|ثاني عشر|ثالث عشر|رابع عشر|خامس عشر)\s*[:\u200F\-–—]/;
 
 function DocumentContentView({ articles, allArticles, lawName }: { articles: any[]; allArticles: any[]; lawName?: string }) {
   // Flatten all paragraphs from all articles into one continuous flow
@@ -560,7 +560,7 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
 
               if (marker) {
                 return (
-                  <div key={idx} className="mt-3">
+                  <div key={idx} className="mt-2">
                     <NumberedItem marker={marker} level={level}>
                       <ArticleReferenceText
                         text={text}
@@ -573,14 +573,13 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
               }
 
               return (
-                <span key={idx} className="text-justify">
+                <p key={idx} className="text-justify mb-1">
                   <ArticleReferenceText
                     text={text}
                     articles={allArticles}
                     currentArticleNumber={articleNumber}
                   />
-                  {' '}
-                </span>
+                </p>
               );
             })}
           </div>
@@ -1003,7 +1002,7 @@ export default function LawDetail() {
                   }}
                 >
                   {showHeader && (currentSection || currentPart || currentChapter || currentBranch || currentSubSection || currentSubSubSection) && (
-                    <div className="text-center py-4 mb-2 mt-4 first:mt-0">
+                    <div className="text-center py-2 mt-2 first:mt-0">
                       {sectionChanged && currentSection && (
                         <div className="section-header-section">{currentSection}</div>
                       )}
@@ -1110,7 +1109,7 @@ export default function LawDetail() {
                             return <p key={idx} className="font-bold text-primary border-r-4 border-primary/20 pr-3 mt-6 mb-2">{toHindiNumerals(trimmed)}</p>;
                           }
                           return (
-                            <p key={idx} className="mr-6 text-foreground/90">
+                            <p key={idx} className="text-foreground/90" style={{ marginInlineStart: '1.5rem' }}>
                               <ArticleReferenceText
                                 text={trimmed}
                                 articles={law.articles}
@@ -1333,7 +1332,7 @@ export default function LawDetail() {
                             const contIndent = prevMarkerLevel >= 2 ? 88 : prevMarkerLevel >= 1 ? 58 : prevMarkerLevel === 0 ? 28 : 0;
 
                             return (
-                              <div key={idx} style={{ marginInlineStart: `${contIndent}px`, whiteSpace: 'pre-wrap' }}>
+                              <div key={idx} style={{ marginInlineStart: `${contIndent}px` }}>
                                 <ArticleReferenceText
                                   text={text}
                                   articles={law.articles}

@@ -80,7 +80,7 @@
   }
   
   .article-container {
-    @apply relative py-6 px-0 my-0 transition-all text-right overflow-visible border-b border-border;
+    @apply relative py-3 px-0 my-0 transition-all text-right overflow-visible border-b border-border;
   }
 
   .article-container:last-child {
@@ -110,7 +110,7 @@
   
 
   .prose-law {
-    line-height: 2;
+    line-height: 1.8;
     font-size: 1.0625rem;
     color: hsl(var(--foreground));
     text-align: justify;
@@ -153,17 +153,11 @@
   }
 
   .law-content-frame {
-    @apply max-w-5xl mx-auto my-4 bg-background shadow-sm border border-border rounded-lg px-8 md:px-12 overflow-visible;
+    @apply max-w-5xl mx-auto my-4 bg-muted/30 shadow-sm border border-border rounded-lg px-8 md:px-12 overflow-visible;
   }
 
   .article-text-wrapper {
     @apply w-full;
-  }
-}
-
-@layer components {
-  .law-content-frame {
-    @apply max-w-5xl mx-auto bg-muted/30 shadow-sm border border-border rounded-lg my-4 overflow-visible;
   }
 }
 

@@ -33,7 +33,7 @@ export function NumberedItem({
         <div
           className="min-w-0 text-justify"
           style={{
-            whiteSpace: 'pre-wrap',
+            whiteSpace: 'normal',
             wordBreak: 'break-word',
             overflowWrap: 'anywhere'
           }}
