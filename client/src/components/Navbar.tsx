@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Scale, Menu, BookOpen, LogOut, LogIn, User, Newspaper, Search, LayoutDashboard, FileText, Gavel, ChevronDown, Info, Mail, Home } from "lucide-react";
+import { Scale, Menu, BookOpen, LogOut, LogIn, User, Newspaper, Search, LayoutDashboard, FileText, Gavel, ChevronDown, Info } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -12,10 +12,6 @@ function roundToApprox(n: number): string {
     const val = Math.floor(n / 100000) / 10;
     return `+${val} مليون`;
   }
-  if (n >= 100000) {
-    const val = Math.floor(n / 1000);
-    return `+${val} ألف`;
-  }
   if (n >= 10000) {
     const val = Math.floor(n / 1000);
     return `+${val} ألف`;
@@ -27,7 +23,15 @@ function roundToApprox(n: number): string {
   return n.toString();
 }
 
-function MoreDropdown({ links, location }: { links: { href: string; label: string; icon: any }[]; location: string }) {
+function MoreDropdown({
+  links,
+  location,
+  label,
+}: {
+  links: { href: string; label: string; icon: any }[];
+  location: string;
+  label: string;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -45,13 +49,13 @@ function MoreDropdown({ links, location }: { links: { href: string; label: strin
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-primary whitespace-nowrap ${isAnyActive ? "text-primary" : "text-muted-foreground"}`}
+        className={`flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-primary whitespace-nowrap ${isAnyActive ? "text-primary" : "text-muted-foreground"}`}
       >
-        أخرى
+        {label}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-2 bg-background border rounded-xl shadow-lg z-50 py-2 min-w-[180px]">
+        <div className="absolute top-full left-0 mt-2 bg-background border rounded-xl shadow-lg z-50 py-2 min-w-[200px]">
           {links.map((link) => {
             const Icon = link.icon;
             const isActive = location === link.href;
@@ -79,7 +83,6 @@ export function Navbar() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const { isAdmin } = useAdmin();
 
-  // Fetch platform stats for marketing ticker
   const { data: stats } = useQuery<{
     totalDocuments: number;
     laws: { articles: number; laws: number };
@@ -92,10 +95,9 @@ export function Navbar() {
       const res = await fetch("/api/search/stats");
       return res.json();
     },
-    staleTime: 3600000, // 1 hour
+    staleTime: 3600000,
   });
 
-  // Global Ctrl+K shortcut to open search page
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -107,34 +109,31 @@ export function Navbar() {
     return () => window.removeEventListener("keydown", handler);
   }, [setLocation]);
 
-  const links = [
-    { href: "/", label: "الرئيسية", icon: Home },
-    { href: "/search", label: "البحث العميق", icon: Search },
+  const primaryLinks = [
+    { href: "/search", label: "البحث", icon: Search },
     { href: "/library", label: "الأنظمة واللوائح", icon: BookOpen },
     { href: "/judgments", label: "الأحكام القضائية", icon: Scale },
-    { href: "/gazette", label: "كشاف أم القرى", icon: Newspaper },
-    { href: "/tameems", label: "التعاميم", icon: FileText },
   ];
 
-  const moreLinks = [
+  const secondaryLinks = [
+    { href: "/", label: "الرئيسية", icon: Search },
+    { href: "/gazette", label: "كشاف أم القرى", icon: Newspaper },
+    { href: "/tameems", label: "التعاميم", icon: FileText },
     { href: "/about", label: "عن المنصة", icon: Info },
   ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center group" data-testid="brand-link">
-            <img
-              src="/tashree-logo.png"
-              alt="شعار تشريع"
-              className="h-11 object-contain transition-transform duration-300 group-hover:scale-105"
-              style={{ width: 'auto' }}
-            />
-          </Link>
-        </div>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-3">
+        <Link href="/" className="flex items-center group shrink-0" data-testid="brand-link">
+          <img
+            src="/tashree-logo.png"
+            alt="شعار تشريع"
+            className="h-11 object-contain transition-transform duration-300 group-hover:scale-105"
+            style={{ width: "auto" }}
+          />
+        </Link>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-4 lg:gap-5">
           {isAdmin && (
             <Link href="/admin" className={`flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-primary ${location.startsWith("/admin") ? "text-primary" : "text-muted-foreground"}`}>
@@ -142,7 +141,8 @@ export function Navbar() {
               لوحة المسؤول
             </Link>
           )}
-          {links.map((link) => {
+
+          {primaryLinks.map((link) => {
             const isActive = location === link.href || (link.href === "/search" && location.startsWith("/search"));
             if (link.href === "/search") {
               return (
@@ -167,25 +167,18 @@ export function Navbar() {
               </Link>
             );
           })}
-          {/* More dropdown */}
-          <MoreDropdown links={moreLinks} location={location} />
+
+          <MoreDropdown links={secondaryLinks} location={location} label="مصادر إضافية" />
         </nav>
 
-        {/* Auth (Desktop) */}
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2 shrink-0">
           {isLoading ? null : isAuthenticated ? (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <User className="w-4 h-4" />
                 {user?.firstName || user?.email || "مستخدم"}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1 text-muted-foreground"
-                onClick={() => logout()}
-                data-testid="button-logout"
-              >
+              <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" onClick={() => logout()} data-testid="button-logout">
                 <LogOut className="w-4 h-4" />
                 خروج
               </Button>
@@ -200,20 +193,18 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Mobile Nav */}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[80%] sm:w-[385px]">
+          <SheetContent side="right" className="w-[82%] sm:w-[385px]">
             <div className="flex flex-col gap-6 mt-6">
-              <div className="flex flex-col">
-                <Link href="/" onClick={() => setIsOpen(false)} className="flex items-center" data-testid="brand-link-mobile">
-                  <img src="/tashree-logo.png" alt="شعار تشريع" className="h-12 object-contain" style={{ width: 'auto' }} />
-                </Link>
-              </div>
+              <Link href="/" onClick={() => setIsOpen(false)} className="flex items-center" data-testid="brand-link-mobile">
+                <img src="/tashree-logo.png" alt="شعار تشريع" className="h-12 object-contain" style={{ width: "auto" }} />
+              </Link>
+
               <nav className="flex flex-col gap-2">
                 {isAdmin && (
                   <Link href="/admin" onClick={() => setIsOpen(false)} className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${location.startsWith("/admin") ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}>
@@ -221,37 +212,24 @@ export function Navbar() {
                     لوحة المسؤول
                   </Link>
                 )}
-                {links.map((link) => {
-                  const isActive = location === link.href;
-                  if (link.href === "/search") {
-                    return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-                      >
-                        <link.icon className="w-5 h-5" />
-                        {link.label}
-                      </Link>
-                    );
-                  }
+
+                <span className="px-4 text-[11px] text-muted-foreground/60 uppercase tracking-wider">الأقسام الرئيسية</span>
+                {primaryLinks.map((link) => {
+                  const isActive = location === link.href || (link.href === "/search" && location.startsWith("/search"));
+                  const baseClass = link.href === "/search"
+                    ? "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                    : `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`;
                   return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      onClick={() => setIsOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}
-                    >
+                    <Link key={link.href} href={link.href} onClick={() => setIsOpen(false)} className={baseClass}>
                       <link.icon className="w-5 h-5" />
                       {link.label}
                     </Link>
                   );
                 })}
-                {/* More links */}
-                <div className="mt-2 pt-2 border-t border-dashed">
-                  <span className="px-4 text-[11px] text-muted-foreground/50 uppercase tracking-wider">أخرى</span>
-                  {moreLinks.map((link) => {
+
+                <div className="mt-2 pt-3 border-t border-dashed">
+                  <span className="px-4 text-[11px] text-muted-foreground/60 uppercase tracking-wider">مصادر إضافية</span>
+                  {secondaryLinks.map((link) => {
                     const isActive = location === link.href;
                     return (
                       <Link
@@ -267,20 +245,15 @@ export function Navbar() {
                   })}
                 </div>
               </nav>
-              {/* Auth section in mobile menu */}
-              <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
+
+              <div className="flex flex-col gap-2 mt-2 pt-4 border-t">
                 {isAuthenticated ? (
                   <>
                     <div className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground">
                       <User className="w-4 h-4" />
                       {user?.firstName || user?.email || "مستخدم"}
                     </div>
-                    <Button
-                      variant="outline"
-                      className="justify-start gap-3"
-                      onClick={() => { logout(); setIsOpen(false); }}
-                      data-testid="button-logout-mobile"
-                    >
+                    <Button variant="outline" className="justify-start gap-3" onClick={() => { logout(); setIsOpen(false); }} data-testid="button-logout-mobile">
                       <LogOut className="w-4 h-4" />
                       تسجيل خروج
                     </Button>
@@ -298,9 +271,9 @@ export function Navbar() {
           </SheetContent>
         </Sheet>
       </div>
-      {/* Marketing Stats Ticker - only on main pages */}
-      {stats && stats.totalDocuments > 0 && (location === "/library" || location === "/search" || location.startsWith("/search?") || location === "/tameems") && (
-        <div className="border-t border-primary/5 bg-gradient-to-l from-primary/[0.04] via-transparent to-accent/[0.04]">
+
+      {stats && stats.totalDocuments > 0 && (location === "/" || location === "/library" || location === "/search" || location.startsWith("/search?")) && (
+        <div className="border-t border-primary/5 bg-gradient-to-l from-primary/[0.05] via-transparent to-accent/[0.05]">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-center gap-4 sm:gap-8 py-1.5 text-[11px] sm:text-xs text-muted-foreground/70 overflow-x-auto">
               <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -321,20 +294,10 @@ export function Navbar() {
               </span>
               <span className="w-px h-3 bg-border hidden sm:block" />
               <span className="hidden sm:flex items-center gap-1 whitespace-nowrap">
-                <FileText className="h-3 w-3 text-primary/50" />
+                <Newspaper className="h-3 w-3 text-primary/50" />
                 <span className="text-primary/70 font-semibold">{roundToApprox(stats.gazette.total)}</span>
                 <span>إصدار جريدة رسمية</span>
               </span>
-              {stats.tameems && stats.tameems.total > 0 && (
-                <>
-                  <span className="w-px h-3 bg-border hidden sm:block" />
-                  <span className="hidden sm:flex items-center gap-1 whitespace-nowrap">
-                    <Newspaper className="h-3 w-3 text-primary/50" />
-                    <span className="text-primary/70 font-semibold">{roundToApprox(stats.tameems.total)}</span>
-                    <span>تعميم</span>
-                  </span>
-                </>
-              )}
             </div>
           </div>
         </div>
