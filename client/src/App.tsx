@@ -11,6 +11,7 @@ import { useAnalytics } from "@/hooks/use-analytics";
 import NotFound from "@/pages/not-found";
 
 // Pages
+import Home from "@/pages/Home";
 import Library from "@/pages/Library";
 import LawDetail from "@/pages/LawDetail";
 import About from "@/pages/About";
@@ -51,7 +52,7 @@ function Router() {
     <>
       <ScrollToTop />
       <Switch>
-        <Route path="/" component={Library} />
+        <Route path="/" component={Home} />
         <Route path="/library" component={Library} />
         <Route path="/judgments" component={Judgments} />
         <Route path="/judgments/:id" component={JudgmentDetail} />

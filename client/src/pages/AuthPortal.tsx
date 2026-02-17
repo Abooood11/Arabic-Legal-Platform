@@ -89,10 +89,12 @@ export default function AuthPortal() {
   };
 
   return (
-    <div className="container mx-auto max-w-md py-10 px-4" dir="rtl">
-      <Card>
-        <CardHeader>
-          <CardTitle>تسجيل الدخول</CardTitle>
+    <div className="min-h-[70vh] flex items-center justify-center px-4" dir="rtl">
+      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
+        <CardHeader className="text-center pb-2">
+          <img src="/tashree-logo.png" alt="تشريع" className="h-10 mx-auto mb-3 object-contain" style={{ width: 'auto' }} />
+          <CardTitle className="text-xl">تسجيل الدخول</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">سجّل دخولك للوصول لأدوات المنصة المتقدمة</p>
         </CardHeader>
         <CardContent>
           {/* Google OAuth Button - always visible */}
@@ -119,19 +121,21 @@ export default function AuthPortal() {
               <TabsTrigger value="register">إنشاء حساب</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="login" className="space-y-3 mt-4">
-              <div><Label>البريد الإلكتروني</Label><Input value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} /></div>
-              <div><Label>كلمة المرور</Label><Input type="password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} /></div>
-              <Button className="w-full" onClick={() => loginMutation.mutate()} disabled={loginMutation.isPending}>دخول</Button>
+            <TabsContent value="login" className="space-y-4 mt-4">
+              <div className="space-y-1.5"><Label>البريد الإلكتروني</Label><Input value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>كلمة المرور</Label><Input type="password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} /></div>
+              <Button className="w-full h-10" onClick={() => loginMutation.mutate()} disabled={loginMutation.isPending}>دخول</Button>
             </TabsContent>
 
-            <TabsContent value="register" className="space-y-3 mt-4">
-              <div><Label>الاسم الأول</Label><Input value={register.firstName} onChange={(e) => setRegister({ ...register, firstName: e.target.value })} /></div>
-              <div><Label>الاسم الأخير</Label><Input value={register.lastName} onChange={(e) => setRegister({ ...register, lastName: e.target.value })} /></div>
-              <div><Label>البريد الإلكتروني</Label><Input value={register.email} onChange={(e) => setRegister({ ...register, email: e.target.value })} /></div>
-              <div><Label>كلمة المرور</Label><Input type="password" value={register.password} onChange={(e) => setRegister({ ...register, password: e.target.value })} /></div>
+            <TabsContent value="register" className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>الاسم الأول</Label><Input value={register.firstName} onChange={(e) => setRegister({ ...register, firstName: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>الاسم الأخير</Label><Input value={register.lastName} onChange={(e) => setRegister({ ...register, lastName: e.target.value })} /></div>
+              </div>
+              <div className="space-y-1.5"><Label>البريد الإلكتروني</Label><Input value={register.email} onChange={(e) => setRegister({ ...register, email: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>كلمة المرور</Label><Input type="password" value={register.password} onChange={(e) => setRegister({ ...register, password: e.target.value })} /></div>
               <p className="text-xs text-muted-foreground">يجب أن تحتوي كلمة المرور على 10 أحرف على الأقل وتتضمن حرفًا كبيرًا وصغيرًا ورقمًا ورمزًا.</p>
-              <Button className="w-full" onClick={() => registerMutation.mutate()} disabled={registerMutation.isPending}>إنشاء حساب</Button>
+              <Button className="w-full h-10" onClick={() => registerMutation.mutate()} disabled={registerMutation.isPending}>إنشاء حساب</Button>
             </TabsContent>
           </Tabs>
         </CardContent>

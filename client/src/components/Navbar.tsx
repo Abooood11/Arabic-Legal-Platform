@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Scale, Menu, BookOpen, LogOut, LogIn, User, Newspaper, Search, LayoutDashboard, FileText, Gavel, ChevronDown, Info, Mail } from "lucide-react";
+import { Scale, Menu, BookOpen, LogOut, LogIn, User, Newspaper, Search, LayoutDashboard, FileText, Gavel, ChevronDown, Info, Mail, Home } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -85,6 +85,7 @@ export function Navbar() {
     laws: { articles: number; laws: number };
     judgments: { total: number };
     gazette: { total: number };
+    tameems?: { total: number };
   }>({
     queryKey: ["platform-stats"],
     queryFn: async () => {
@@ -107,6 +108,7 @@ export function Navbar() {
   }, [setLocation]);
 
   const links = [
+    { href: "/", label: "الرئيسية", icon: Home },
     { href: "/search", label: "البحث العميق", icon: Search },
     { href: "/library", label: "الأنظمة واللوائح", icon: BookOpen },
     { href: "/judgments", label: "الأحكام القضائية", icon: Scale },
@@ -122,7 +124,7 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/library" className="flex items-center group" data-testid="brand-link">
+          <Link href="/" className="flex items-center group" data-testid="brand-link">
             <img
               src="/tashree-logo.png"
               alt="شعار تشريع"
@@ -208,7 +210,7 @@ export function Navbar() {
           <SheetContent side="right" className="w-[80%] sm:w-[385px]">
             <div className="flex flex-col gap-6 mt-6">
               <div className="flex flex-col">
-                <Link href="/library" onClick={() => setIsOpen(false)} className="flex items-center" data-testid="brand-link-mobile">
+                <Link href="/" onClick={() => setIsOpen(false)} className="flex items-center" data-testid="brand-link-mobile">
                   <img src="/tashree-logo.png" alt="شعار تشريع" className="h-12 object-contain" style={{ width: 'auto' }} />
                 </Link>
               </div>
@@ -297,7 +299,7 @@ export function Navbar() {
         </Sheet>
       </div>
       {/* Marketing Stats Ticker - only on main pages */}
-      {stats && stats.totalDocuments > 0 && (location === "/" || location === "/library" || location === "/search" || location.startsWith("/search?") || location === "/tameems") && (
+      {stats && stats.totalDocuments > 0 && (location === "/library" || location === "/search" || location.startsWith("/search?") || location === "/tameems") && (
         <div className="border-t border-primary/5 bg-gradient-to-l from-primary/[0.04] via-transparent to-accent/[0.04]">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-center gap-4 sm:gap-8 py-1.5 text-[11px] sm:text-xs text-muted-foreground/70 overflow-x-auto">
@@ -323,7 +325,7 @@ export function Navbar() {
                 <span className="text-primary/70 font-semibold">{roundToApprox(stats.gazette.total)}</span>
                 <span>إصدار جريدة رسمية</span>
               </span>
-              {stats.tameems?.total > 0 && (
+              {stats.tameems && stats.tameems.total > 0 && (
                 <>
                   <span className="w-px h-3 bg-border hidden sm:block" />
                   <span className="hidden sm:flex items-center gap-1 whitespace-nowrap">

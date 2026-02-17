@@ -31,592 +31,710 @@
         {
           "marker": "",
           "text": "TGA-R-0000-GDN-230504-12",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الإصدار (الثاني)",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
-          "marker": "",
-          "text": "1",
-          "level": 0
+          "marker": "1",
+          "text": "",
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "تمهيد",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
-          "marker": "1.",
-          "text": "1 تاريخ المراجعة",
-          "level": 1
+          "marker": "1",
+          "text": "تاريخ المراجعة",
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "التاريخ",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الإصدار",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "تفاصيل التعديلات",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "اكتوبر 2017",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
-          "marker": "",
-          "text": "1",
-          "level": 0
+          "marker": "1",
+          "text": "",
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الإصدار الأول",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "مايو 2023",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
-          "marker": "",
-          "text": "2",
-          "level": 0
+          "marker": "2",
+          "text": "",
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "مراجعة وتحديث",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
-          "marker": "2.",
-          "text": "1",
-          "level": 1
+          "marker": "1",
+          "text": "",
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الوثيقة الرئيسية",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "يجب قراءة هذا المستند مع الدليل الإرشادي 01: الوثيقة الرئيسية حيث تتناول جميع التعريفات والمعايير المستخدمة في مجموعة الأدلة والوثائق الارشادية.",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
-          "marker": "3.",
-          "text": "1",
-          "level": 1
+          "marker": "1",
+          "text": "",
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الاختصارات",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "هذه الاختصارات لغرض الاستخدام لهذه الوثيقة.",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الاختصار",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الوصف",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "ALARP",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "منخفضة إلى أدنى حد معقول",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "KPI",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "مؤشر الأداء الرئيسي",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "MAA",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "المعدل السنوي المتحرك",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "NSA",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "تنبيهات السلامة الوطنية",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "TGA",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الهيئة العامة للنقل",
-          "level": 0
+          "level": 2,
+          "section_type": "preamble"
         },
         {
-          "marker": "",
-          "text": "2",
-          "level": 0
+          "marker": "2",
+          "text": "",
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "مقدمة",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
-          "marker": "",
-          "text": "2 -1",
-          "level": 0
+          "marker": "2 -1",
+          "text": "",
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الغرض",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "الغرض من هذه الوثيقة هو تحديد المتطلبات العامة اللازمة لعملية الإبلاغ ورفع التقارير ذات العلاقة بمستوى الأداء الآمن والفعال لجميع خدمات الخطوط الحديدية داخل المملكة العربية السعودية بما يلبي أهداف الهيئة العامة للنقل في توحيد النهج العام لمقياس الأداء لأنظمة الخطوط الحديدية داخل المملكة وعلى وجه الخصوص ما يتعلق بتطبيق واعتماد المعايير والمقاييس الدولية",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
-          "marker": "2.",
-          "text": "2",
-          "level": 1
+          "marker": "2",
+          "text": "",
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "نطاق الدليل",
-          "level": 0
+          "level": 0,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": "يُطبق نطاق عمل هذا الدليل على جميع أنظمة الخطوط الحديدية وأنظمة النقل الموجهة الأخرى في المملكة العربية السعودية التي لديها مثل هذه الأنظمة أو ترغب في الحصول على رخصة تشغيل لأنشطة الخطوط الحديدية وشهادة السلامة الخاصة بها",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 1,
+          "section_type": "preamble"
         },
         {
-          "marker": "3.",
-          "text": "2 متطلبات السلامة وإدارة الأداء",
-          "level": 1
+          "marker": "2",
+          "text": "متطلبات السلامة وإدارة الأداء",
+          "level": 0,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "يعد الأداء الفعال والسلامة في أنشطة الخطوط الحديدية أمراً حيوياً وبالغ الأهمية لما له من منافع لجميع أصحاب المصلحة. لذلك يجب الحفاظ على المستويات المطلوبة وبدرجة عالية من حيث الاستثمار في المعدات والأفراد والأنظمة لتحقيق أعلى مستويات الأداء الممكنة مع ضمان استمرار سلامة الموظفين والعملاء.",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "لذا فإنه يشترط عند إصدار رخصة تشغيل أنشطة وخدمات الخطوط الحديدية (الشرط",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "G.",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ")",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "أن «تفي الجهة الطالبة للرخصة بكافة المتطلبات المعقولة لمستخدمي الخدمات... فيما يتعلق بـ ... أداء خدمات الخطوط الحديدية». راجع الدليل 03: خطة تسليم وتنفيذ أعمال الرخصة والحاجة إلى تضمين إدارة الأداء في خطة تسليم وتنفيذ أعمال الرخصة",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "ومن الأهمية مراعاة المتطلبات الاقتصادية ومتطلبات تقديم الخدمات مع بذل كل ما يمكن من جهد معقول لتحقيق أفضل النتائج الممكنة، كما أنه لا ينبغي على الإطلاق التغاضي عن أو التساهل مع الأمور المتعلقة بقواعد وأنظمة السلامة. فأهداف الشركة أو الجهة وخطط تسليم الأداء يمكن أن تتحقق بسهولة أكبر في إطار تبنى قواعد السلامة وتعزيزها",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
-          "marker": "3-",
+          "marker": "",
           "text": "إدارة الأداء",
-          "level": 1
+          "level": 0,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "تتضمن إدارة الأداء أربعة أنشطة رئيسية",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ":",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- تحديد ما يتعين قياسه.",
-          "level": 0
+          "marker": "-",
+          "text": "تحديد ما يتعين قياسه.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- تحديد الأهداف.",
-          "level": 0
+          "marker": "-",
+          "text": "تحديد الأهداف.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- رصد النتائج وتسجيلها وتقديم تقاريرها.",
-          "level": 0
+          "marker": "-",
+          "text": "رصد النتائج وتسجيلها وتقديم تقاريرها.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- تحليل النتائج وتحديد مجالات التحسين.",
-          "level": 0
+          "marker": "-",
+          "text": "تحليل النتائج وتحديد مجالات التحسين.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "وهذه عملية دورية ومتكررة",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "3 -1",
-          "level": 0
+          "marker": "3 -1",
+          "text": "",
+          "level": 0,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "تحديد ما يتعين قياسه",
-          "level": 0
+          "level": 0,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "يحدد مزود خدمة الخطوط الحديدية مجموعة من المخرجات التي يمكن تحقيقها بواسطة العميل/الممول. وهذا يتعين قياسه حتى تتمكن الخطوط الحديدية من تحقيق أهدافها المحددة",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "تنقسم المخرجات إلى أربع مجموعات عامة وهي:",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "خدمة الخطوط الحديدية، وتشمل على سبيل المثال:",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "الموثوقية في خدمات قطار الركاب والالتزام بالمواعيد.",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "توفير مرافق وخدمات للركاب.",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "أداء قطار خدمات الشحن – الحمولات بالأطنان والموثوقية وأمن وسلامة الحمولة، إلخ",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "السلامة التشغيلية.",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "إدارة الأصول.",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "الأداء المالي.",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "1.",
-          "text": "1.3 الأداء في خدمات الخطوط الحديدية",
-          "level": 1
+          "marker": "1.3",
+          "text": "الأداء في خدمات الخطوط الحديدية",
+          "level": 0,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "تعمل الهيئة العامة للنقل على حماية ممول أنشطة وخدمات الخطوط الحديدية من خلال ضمان تشغيل الخطوط الحديدية بكفاءة واقتصادية، واستخدام الأصول لتحقيق أفضل منفعة وفائدة. وتقوم الهيئة بفحص التعريفات والرسوم والموافقة عليها للتأكد من أن المرخص لهم يوفرون خدمات الوصول العادل للمستفيدين بما يتماشى مع ما حدده المموّلون لذلك، هناك نطاق واسع من المخرجات التي يتعين قياسها",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "كما يتعين أن تكون خدمات الخطوط الحديدية المقدمة تتميز بجودة خدمة تلبي أو تتجاوز المتطلبات التي حددها مموليها والتزاماتها في ترخيصها",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ".",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "أما بالنسبة لعمليات الشحن، فإنها تشمل:",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- الحمولة بالأطنان/الحاويات المنقولة (مقارنة بمتطلبات المستفيدين).",
-          "level": 0
+          "marker": "-",
+          "text": "الحمولة بالأطنان/الحاويات المنقولة (مقارنة بمتطلبات المستفيدين).",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- القطارات التي تعمل بموجب الخطة الموضوعة.",
-          "level": 0
+          "marker": "-",
+          "text": "القطارات التي تعمل بموجب الخطة الموضوعة.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- وقت الوصول إلى الوجهة المنشودة.",
-          "level": 0
+          "marker": "-",
+          "text": "وقت الوصول إلى الوجهة المنشودة.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- مرافق الشحن/محطة الشحن (توافر أفراد التحميل/ التفريغ والمصنع).",
-          "level": 0
+          "marker": "-",
+          "text": "مرافق الشحن/محطة الشحن (توافر أفراد التحميل/ التفريغ والمصنع).",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- أمن البضائع/سلامتها (عدم التسريب وما إلى ذلك).",
-          "level": 0
+          "marker": "-",
+          "text": "أمن البضائع/سلامتها (عدم التسريب وما إلى ذلك).",
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "بالنسبة لخدمات الركاب، يمكن أن تشمل المقاييس والمعايير ما يلي",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ":",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "المقاييس الثابتة مثل",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ":",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- الموثوقية (٪ الخدمات التي يتم تشغيلها وفقاً لما هو معلن عنه).",
-          "level": 0
+          "marker": "-",
+          "text": "الموثوقية (٪ الخدمات التي يتم تشغيلها وفقاً لما هو معلن عنه).",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- دقة المواعيد (تلك المعلنة والمسجلة في وجهة الوصول وأي نقاط وسيطة رئيسية).",
-          "level": 0
+          "marker": "-",
+          "text": "دقة المواعيد (تلك المعلنة والمسجلة في وجهة الوصول وأي نقاط وسيطة رئيسية).",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- السعة المتوفرة.",
-          "level": 0
+          "marker": "-",
+          "text": "السعة المتوفرة.",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- عدد الركاب المنقولين.",
-          "level": 0
+          "marker": "-",
+          "text": "عدد الركاب المنقولين.",
+          "level": 3,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "المعايير والمقاييس التفاعلية، مثل",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ":",
-          "level": 0
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- أحكام خاصة بذوي الإعاقة.",
-          "level": 0
+          "marker": "-",
+          "text": "أحكام خاصة بذوي الإعاقة.",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- الخدمات على متن القطار (المعلومات والأمتعة والمطاعم وخدمة الإنترنت",
-          "level": 0
+          "marker": "-",
+          "text": "الخدمات على متن القطار (المعلومات والأمتعة والمطاعم وخدمة الإنترنت",
+          "level": 3,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "Wi-Fi",
-          "level": 0
+          "level": 3,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "والمراحيض والمغاسل والنظافة وما إلى ذلك).",
-          "level": 0
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- مرافق المحطة (مواقف السيارات، توافر منافذ بيع التذاكر، معلومات خدمة القطار، لافتات إرشادية، تسجيل وصول الأمتعة وتسليمها، الأمن، تقديم الطعام، المراحيض/الحمامات، غرفة أو مكان مخصص للصلاة، النظافة...إلخ).",
-          "level": 0
+          "marker": "-",
+          "text": "مرافق المحطة (مواقف السيارات، توافر منافذ بيع التذاكر، معلومات خدمة القطار، لافتات إرشادية، تسجيل وصول الأمتعة وتسليمها، الأمن، تقديم الطعام، المراحيض/الحمامات، غرفة أو مكان مخصص للصلاة، النظافة...إلخ).",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- التوعية (محتوى موقع الويب وتوافره، أنشطة التسويق).",
-          "level": 0
+          "marker": "-",
+          "text": "التوعية (محتوى موقع الويب وتوافره، أنشطة التسويق).",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- خدمة العملاء (التواجد في المحطات والقطارات ومعلومات الرحلة/ حل أي مشاكل للعملاء أثناء وما بعد الرحلة).",
-          "level": 0
+          "marker": "-",
+          "text": "خدمة العملاء (التواجد في المحطات والقطارات ومعلومات الرحلة/ حل أي مشاكل للعملاء أثناء وما بعد الرحلة).",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- إدارة الاضطراب أو الإخلال بالنظام.",
-          "level": 0
+          "marker": "-",
+          "text": "إدارة الاضطراب أو الإخلال بالنظام.",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- الفعالية والتواصل.",
-          "level": 0
+          "marker": "-",
+          "text": "الفعالية والتواصل.",
+          "level": 3,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- الاستجابة لشكاوى وطلبات الركاب.",
-          "level": 0
+          "marker": "-",
+          "text": "الاستجابة لشكاوى وطلبات الركاب.",
+          "level": 3,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "بالنسبة لمالكي البنية التحتية/ القائمين بصيانتها، يمكن أن تشمل المعايير والمقاييس المناسبة ما يلي",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ":",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- جاهزية وتوفر الشبكة من أجل قطارات تدر دخلاً وعائداً.",
-          "level": 0
+          "marker": "-",
+          "text": "جاهزية وتوفر الشبكة من أجل قطارات تدر دخلاً وعائداً.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- عدد القيود السرعة أو الوزن التي تؤثر على تدفق حركة القطارات في المكان.",
-          "level": 0
+          "marker": "-",
+          "text": "عدد القيود السرعة أو الوزن التي تؤثر على تدفق حركة القطارات في المكان.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- عدد حالات أعطال الأجهزة والمعدات الكبيرة مثل القضبان المكسورة والنقاط لحركة القضبان وفشل وأعطال عمل نظام الإشارات.",
-          "level": 0
+          "marker": "-",
+          "text": "عدد حالات أعطال الأجهزة والمعدات الكبيرة مثل القضبان المكسورة والنقاط لحركة القضبان وفشل وأعطال عمل نظام الإشارات.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- أعطال التقاطعات للقطارات التي تؤثر على استخدام الطريق للسيارات.",
-          "level": 0
+          "marker": "-",
+          "text": "أعطال التقاطعات للقطارات التي تؤثر على استخدام الطريق للسيارات.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- مخرجات صيانة وإصلاح الأصول (ولا سيما إنجاز أعمال الصيانة الوقائية المخطط لها).",
-          "level": 0
+          "marker": "-",
+          "text": "مخرجات صيانة وإصلاح الأصول (ولا سيما إنجاز أعمال الصيانة الوقائية المخطط لها).",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "2-",
-          "text": "1-3",
-          "level": 1
+          "marker": "1-3",
+          "text": "",
+          "level": 0,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "السلامة التشغيلية",
-          "level": 0
+          "level": 0,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "يتم تحديد مقاييس ومعايير السلامة كمدخلات ومخرجات. وما يُعرف أيضاً باسم المؤشرات «المبكرة» و«المتأخرة».",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": "المؤشرات المبكرة أو المتقدمة هي تلك التدابير الاستباقية التي تقيس جهود الوقاية للسلامة التي يتم ملاحظتها وتسجيلها قبل وقوع الحوادث. يمكن أن تشمل الموضوعات الرئيسية المحددة ما يلي",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
           "marker": "",
           "text": ":",
-          "level": 0
+          "level": 1,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- اجتماعات إدارة السلامة الاستراتيجية والمحلية.",
-          "level": 0
+          "marker": "-",
+          "text": "اجتماعات إدارة السلامة الاستراتيجية والمحلية.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
-          "marker": "",
-          "text": "- التقدم المحرز في خطة تنفيذ نظام إدارة السلامة.",
-          "level": 0
+          "marker": "-",
+          "text": "التقدم المحرز في خطة تنفيذ نظام إدارة السلامة.",
+          "level": 2,
+          "section_type": "operative"
         },
         {
           "marker": "",
@@ -3532,5 +3650,11 @@
       "amendments": [],
       "heading_context": []
     }
-  ]
+  ],
+  "_reparse_metadata": {
+    "reparsed_at": "2026-02-17T02:21:44.422Z",
+    "model": "gemini-2.5-flash",
+    "version": "1.0",
+    "paragraphs_processed": 118
+  }
 }

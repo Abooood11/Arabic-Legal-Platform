@@ -1271,14 +1271,27 @@ export default function LawDetail() {
 
                             // Render table paragraphs
                             if (vp.paraType === 'table' && vp.tableRows) {
+                              const rows = vp.tableRows as string[][];
+                              const hasHeader = rows.length > 1;
                               return (
-                                <div key={idx} className="my-3 overflow-x-auto">
+                                <div key={idx} className="my-4 overflow-x-auto rounded-lg border border-border">
                                   <table className="w-full border-collapse text-sm" style={{ direction: 'rtl' }}>
+                                    {hasHeader && (
+                                      <thead>
+                                        <tr className="bg-primary/10">
+                                          {rows[0].map((cell: string, ci: number) => (
+                                            <th key={ci} className="border-b border-border px-4 py-3 text-right font-bold text-primary whitespace-pre-line">
+                                              {toHindiNumerals(cell)}
+                                            </th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                    )}
                                     <tbody>
-                                      {vp.tableRows.map((row: string[], ri: number) => (
-                                        <tr key={ri} className={ri % 2 === 0 ? 'bg-accent/10/40' : 'bg-background'}>
+                                      {(hasHeader ? rows.slice(1) : rows).map((row: string[], ri: number) => (
+                                        <tr key={ri} className={ri % 2 === 0 ? 'bg-muted/30' : 'bg-background'}>
                                           {row.map((cell: string, ci: number) => (
-                                            <td key={ci} className="border border-border px-4 py-2.5 text-right">
+                                            <td key={ci} className="border-b border-border/50 px-4 py-2.5 text-right align-top whitespace-pre-line">
                                               {toHindiNumerals(cell)}
                                             </td>
                                           ))}

@@ -159,76 +159,85 @@ export default function Library() {
     : contentTotal;
 
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-primary mb-2">الأنظمة واللوائح</h1>
-        <p className="text-muted-foreground">
-          {isLoadingResults ? "جارٍ التحميل..." : `${resultCount} نتيجة`}
-          {searchMode === "name" && library && filteredLibrary && filteredLibrary.length !== library.length && ` من أصل ${library.length}`}
-        </p>
-      </div>
-
-      {/* Search bar with mode toggle */}
-      <div className="flex flex-col gap-3 mb-6">
-        <div className="flex gap-2 items-center">
-          {/* Search mode toggle */}
-          <div className="flex bg-muted rounded-lg p-0.5 shrink-0">
-            <button
-              onClick={() => handleModeChange("name")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                searchMode === "name"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Tag className="w-3.5 h-3.5" />
-              بالاسم
-            </button>
-            <button
-              onClick={() => handleModeChange("content")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                searchMode === "content"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              في المحتوى
-            </button>
+    <div className="min-h-screen bg-muted/20">
+      {/* Hero / Search Header */}
+      <div className="bg-gradient-to-b from-primary/5 to-background border-b">
+        <div className="container mx-auto px-4 pt-8 pb-6">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <BookOpen className="h-6 w-6 text-primary" />
+            </div>
+            <h1 className="text-3xl font-bold text-primary">الأنظمة واللوائح</h1>
           </div>
+          <p className="text-muted-foreground text-sm mb-5 mr-12">
+            {isLoadingResults ? "جارٍ التحميل..." : `${resultCount} نتيجة`}
+            {searchMode === "name" && library && filteredLibrary && filteredLibrary.length !== library.length && ` من أصل ${library.length}`}
+          </p>
 
-          {/* Search input */}
-          <div className="relative flex-1">
-            <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={searchMode === "name" ? "ابحث باسم النظام أو اللائحة..." : "ابحث في نصوص المواد والأحكام..."}
-              className="pr-9"
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-            />
+          {/* Search bar with mode toggle */}
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2 items-center max-w-2xl">
+              {/* Search mode toggle */}
+              <div className="flex bg-muted rounded-lg p-0.5 shrink-0">
+                <button
+                  onClick={() => handleModeChange("name")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    searchMode === "name"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  بالاسم
+                </button>
+                <button
+                  onClick={() => handleModeChange("content")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    searchMode === "content"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  في المحتوى
+                </button>
+              </div>
+
+              {/* Search input */}
+              <div className="relative flex-1">
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder={searchMode === "name" ? "ابحث باسم النظام أو اللائحة..." : "ابحث في نصوص المواد والأحكام..."}
+                  className="pr-12 h-12 text-base rounded-xl shadow-sm border-2 focus:border-primary"
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Filters - only show for name search mode */}
+            {searchMode === "name" && (
+              <div className="flex flex-wrap gap-2">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => handleFilterChange(f.value)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      formFilter === f.value
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Filters - only show for name search mode */}
-        {searchMode === "name" && (
-          <div className="flex flex-wrap gap-2">
-            {FILTERS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => handleFilterChange(f.value)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  formFilter === f.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+
+      <div className="container mx-auto px-4 py-6">
 
       {/* Results */}
       {isLoadingResults ? (
@@ -394,6 +403,7 @@ export default function Library() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
