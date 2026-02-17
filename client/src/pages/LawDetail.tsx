@@ -635,7 +635,7 @@ export default function LawDetail() {
   const filteredArticles = useLawSearch(law, searchQuery);
 
   // Detect non-law document types (decisions, gazette) that should NOT show article formatting
-  const isDocumentType = law?.category === 'decision' || law?.category === 'gazette';
+  const isDocumentType = !!law?.category && law.category !== 'law';
 
   const [copyingId, setCopyingId] = useState<number | null>(null);
   
