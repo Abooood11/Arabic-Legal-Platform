@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { ScanFinding, ScanResult, AuditContext } from "../types";
 
-// Map Arabic ordinals to numbers
+// Map Arabic ordinals to numbers (expanded to cover all common references)
 const ORDINAL_MAP: Record<string, number> = {
   "الأولى": 1, "الأول": 1, "الثانية": 2, "الثاني": 2, "الثالثة": 3, "الثالث": 3,
   "الرابعة": 4, "الرابع": 4, "الخامسة": 5, "الخامس": 5, "السادسة": 6, "السادس": 6,
@@ -13,11 +13,27 @@ const ORDINAL_MAP: Record<string, number> = {
   "السادسة عشرة": 16, "السادس عشر": 16, "السابعة عشرة": 17, "السابع عشر": 17,
   "الثامنة عشرة": 18, "الثامن عشر": 18, "التاسعة عشرة": 19, "التاسع عشر": 19,
   "العشرين": 20, "العشرون": 20,
+  "الحادية والعشرين": 21, "الثانية والعشرين": 22, "الثالثة والعشرين": 23,
+  "الرابعة والعشرين": 24, "الخامسة والعشرين": 25, "السادسة والعشرين": 26,
+  "السابعة والعشرين": 27, "الثامنة والعشرين": 28, "التاسعة والعشرين": 29,
+  "الثلاثين": 30, "الثلاثون": 30,
+  "الحادية والثلاثين": 31, "الثانية والثلاثين": 32, "الثالثة والثلاثين": 33,
+  "الرابعة والثلاثين": 34, "الخامسة والثلاثين": 35, "السادسة والثلاثين": 36,
+  "السابعة والثلاثين": 37, "الثامنة والثلاثين": 38, "التاسعة والثلاثين": 39,
+  "الأربعين": 40, "الأربعون": 40,
+  "الخمسين": 50, "الخمسون": 50,
+  "الستين": 60, "الستون": 60,
+  "السبعين": 70, "السبعون": 70,
+  "الثمانين": 80, "الثمانون": 80,
+  "التسعين": 90, "التسعون": 90,
+  "المائة": 100, "المئة": 100,
 };
 
 // Match "المادة X" where X is a number or ordinal
 const ARTICLE_REF_NUMERIC = /المادة\s+(\d+)/g;
-const ARTICLE_REF_ORDINAL = /المادة\s+(الأولى|الأول|الثانية|الثاني|الثالثة|الثالث|الرابعة|الرابع|الخامسة|الخامس|السادسة|السادس|السابعة|السابع|الثامنة|الثامن|التاسعة|التاسع|العاشرة|العاشر|الحادية عشرة|الحادي عشر|الثانية عشرة|الثاني عشر|الثالثة عشرة|الثالث عشر|الرابعة عشرة|الرابع عشر|الخامسة عشرة|الخامس عشر|السادسة عشرة|السادس عشر|السابعة عشرة|السابع عشر|الثامنة عشرة|الثامن عشر|التاسعة عشرة|التاسع عشر|العشرين|العشرون)/g;
+// Build ordinal regex dynamically from ORDINAL_MAP keys, sorted longest-first
+const ORDINAL_KEYS_SORTED = Object.keys(ORDINAL_MAP).sort((a, b) => b.length - a.length);
+const ARTICLE_REF_ORDINAL = new RegExp(`المادة\\s+(${ORDINAL_KEYS_SORTED.join("|")})`, "g");
 
 export async function runReferenceScan(context: AuditContext): Promise<ScanResult> {
   const findings: ScanFinding[] = [];
@@ -51,8 +67,7 @@ export async function runReferenceScan(context: AuditContext): Promise<ScanResul
     if (!lawData || !Array.isArray(lawData.articles)) continue;
 
     const lawName = lawData.law_name || item.title_ar || item.id;
-    const maxArticle = Math.max(...lawData.articles.map((a: any) => a.number || 0));
-    const existingNumbers = new Set(lawData.articles.map((a: any) => a.number));
+    const existingNumbers = new Set<number>(lawData.articles.map((a: any) => a.number));
     let hasIssue = false;
 
     for (const article of lawData.articles) {
@@ -79,9 +94,9 @@ export async function runReferenceScan(context: AuditContext): Promise<ScanResul
         }
       }
 
-      // Check if referenced articles exist
+      // Check if referenced articles exist (only flag if article doesn't exist in this law)
       for (const refNum of referencedNumbers) {
-        if (!existingNumbers.has(refNum) && refNum > 0 && refNum <= maxArticle + 10) {
+        if (!existingNumbers.has(refNum) && refNum > 0) {
           findings.push({
             severity: "high",
             code: "BROKEN_REFERENCE",

@@ -224,7 +224,7 @@ const TRIGGER_WORDS = generatePrefixedForms(BASE_TRIGGER_WORDS);
 
 // Parse article cross-references (المادة الخامسة، المادتين...) into clickable segments.
 // See: docs/extraction/boe_formatting_playbook.md (sections C, E)
-function parseArticleReferences(text: string): ParsedSegment[] {
+function parseArticleReferences(text: string, validArticleNumbers: Set<number>): ParsedSegment[] {
   const segments: ParsedSegment[] = [];
   let currentIndex = 0;
   
@@ -265,7 +265,7 @@ function parseArticleReferences(text: string): ParsedSegment[] {
           const rawPart = parts[pi].trim();
           const part = rawPart.replace(/^و/, '').trim();
           const partNum = parseArabicArticleNumber(part);
-          if (partNum && partNum >= 1 && partNum <= 721) {
+          if (partNum && validArticleNumbers.has(partNum)) {
             anyValid = true;
             if (pi > 0) {
               // Preserve the original connector text (و prefix)
@@ -296,7 +296,7 @@ function parseArticleReferences(text: string): ParsedSegment[] {
       } else {
         const articleNumber = parseArabicArticleNumber(refContent);
 
-        if (articleNumber && articleNumber >= 1 && articleNumber <= 721) {
+        if (articleNumber && validArticleNumbers.has(articleNumber)) {
           // Valid single parenthetical reference
           segments.push({ type: 'text', content: triggerWord + whitespace });
           segments.push({
@@ -318,7 +318,7 @@ function parseArticleReferences(text: string): ParsedSegment[] {
             const contRef = contMatch[2].trim();
             const contNumber = parseArabicArticleNumber(contRef);
 
-            if (contNumber && contNumber >= 1 && contNumber <= 721) {
+            if (contNumber && validArticleNumbers.has(contNumber)) {
               segments.push({ type: 'text', content: connector });
               segments.push({
                 type: 'reference',
@@ -362,7 +362,7 @@ function parseArticleReferences(text: string): ParsedSegment[] {
             : testText.match(/^([٠-٩]+)$/) ? parseInt(testText.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()), 10)
             : null;
           const parsed = exactMatch ?? digitMatch ?? null;
-          if (parsed !== null && parsed >= 1 && parsed <= 721) {
+          if (parsed !== null && validArticleNumbers.has(parsed)) {
             articleNumber = parsed;
             numberText = testText;
           } else if (articleNumber !== null) {
@@ -394,7 +394,7 @@ function parseArticleReferences(text: string): ParsedSegment[] {
               const connector = contMatch[1];
               const contCandidate = contMatch[2].trim();
               const contNumber = parseArabicArticleNumber(contCandidate);
-              if (contNumber && contNumber >= 1 && contNumber <= 721) {
+              if (contNumber && validArticleNumbers.has(contNumber)) {
                 segments.push({ type: 'text', content: connector });
                 segments.push({
                   type: 'reference',
@@ -706,7 +706,10 @@ export function ArticleReferenceText({
   // Track expanded articles by article number only (not segment index) to avoid duplicates
   const [expandedArticles, setExpandedArticles] = useState<Record<number, boolean>>({});
 
-  const segments = useMemo(() => parseArticleReferences(text), [text]);
+  // Build a Set of valid article numbers from the actual articles in this law
+  const validArticleNumbers = useMemo(() => new Set(articles.map(a => a.number)), [articles]);
+
+  const segments = useMemo(() => parseArticleReferences(text, validArticleNumbers), [text, validArticleNumbers]);
 
   const toggleReference = useCallback((articleNumber: number) => {
     setExpandedArticles(prev => ({
