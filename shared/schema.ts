@@ -81,6 +81,8 @@ export const cabinetDecisionSchema = z.object({
 
 export const lawSchema = z.object({
   law_name: z.string(),
+  category: z.string().optional(),
+  doc_type: z.string().optional(),
   preamble: z.any().optional(),
   preamble_text: z.string().optional(),
   royal_decree: z.any().optional(),

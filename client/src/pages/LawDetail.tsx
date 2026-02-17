@@ -506,6 +506,98 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
 
 type OverridesMap = Record<string, { overrideText: string; updatedAt: string; updatedBy: string }>;
 
+/**
+ * Renders decisions/gazette content as a single flowing document.
+ * Saudi legal documents that are NOT أنظمة (laws) include:
+ * - قرارات (decisions): cabinet decisions, ministerial orders, authority resolutions
+ * - منشورات (gazette): official announcements, statements
+ *
+ * These documents have a specific structure:
+ * - Article 0 "مقدمة": usually just the title/subject — skip if short
+ * - Subsequent "articles": contain the preamble (بناءً على...) and the actual decision text
+ * - Numbered items (أولاً، ثانياً...): the substantive provisions of the decision
+ *
+ * We render them as a single flowing document, respecting the Saudi legal drafting style.
+ */
+function DocumentContentView({ articles, allArticles }: { articles: any[]; allArticles: any[] }) {
+  // Filter out article 0 "مقدمة" if it's just a short title (< 80 chars, no paragraphs)
+  const contentArticles = articles.filter((a: any) => {
+    if (a.number === 0 && a.number_text === 'مقدمة') {
+      const text = (a.text || '').trim();
+      const hasParagraphs = a.paragraphs && a.paragraphs.length > 1;
+      if (text.length < 80 && !hasParagraphs) return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="law-content-frame">
+      <div className="space-y-4">
+        {contentArticles.map((article: any, idx: number) => {
+          const text = article.text || "";
+          const hasParagraphs = article.paragraphs && article.paragraphs.length > 0;
+
+          return (
+            <div key={idx} className="article-container">
+              <div className="article-text-wrapper">
+                <div className="prose-law">
+                  {hasParagraphs ? (
+                    <div className="space-y-2">
+                      {article.paragraphs.map((para: any, pIdx: number) => {
+                        const marker = (para.marker || "").trim();
+                        const paraText = (para.text || "").trim();
+                        if (!marker && !paraText) return null;
+
+                        if (marker) {
+                          return (
+                            <NumberedItem key={pIdx} marker={marker} level={para.level || 0}>
+                              <ArticleReferenceText
+                                text={paraText}
+                                articles={allArticles}
+                                currentArticleNumber={article.number}
+                              />
+                            </NumberedItem>
+                          );
+                        }
+
+                        return (
+                          <p key={pIdx} className="text-justify">
+                            <ArticleReferenceText
+                              text={paraText}
+                              articles={allArticles}
+                              currentArticleNumber={article.number}
+                            />
+                          </p>
+                        );
+                      })}
+                    </div>
+                  ) : text ? (
+                    <div className="space-y-2">
+                      {text.split('\n').map((line: string, lIdx: number) => {
+                        const trimmed = line.trim();
+                        if (!trimmed) return null;
+                        return (
+                          <p key={lIdx} className="text-justify">
+                            <ArticleReferenceText
+                              text={trimmed}
+                              articles={allArticles}
+                              currentArticleNumber={article.number}
+                            />
+                          </p>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function LawDetail() {
   const [, params] = useRoute("/law/:id");
   const id = params?.id || "";
@@ -541,6 +633,9 @@ export default function LawDetail() {
   const overrides = overridesData?.overrides || {};
   
   const filteredArticles = useLawSearch(law, searchQuery);
+
+  // Detect non-law document types (decisions, gazette) that should NOT show article formatting
+  const isDocumentType = law?.category === 'decision' || law?.category === 'gazette';
 
   const [copyingId, setCopyingId] = useState<number | null>(null);
   
@@ -706,7 +801,7 @@ export default function LawDetail() {
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Sticky Location Breadcrumb Bar - Below Navbar (h-20 = 80px = top-20) */}
-      {showBreadcrumbs && (
+      {showBreadcrumbs && !isDocumentType && (
         <div
           className="bg-background/95 backdrop-blur-sm border-b border-border/80 sticky top-20 z-40"
           style={{ direction: 'rtl' }}
@@ -764,7 +859,7 @@ export default function LawDetail() {
       )}
 
       {/* Re-show Breadcrumbs Toggle (Visible when hidden) */}
-      {!showBreadcrumbs && (
+      {!showBreadcrumbs && !isDocumentType && (
         <div className="fixed bottom-6 left-6 z-50">
           <Button
             size="sm"
@@ -828,7 +923,7 @@ export default function LawDetail() {
       )}
 
       {/* Show All Regulations Toggle - Fixed Position */}
-      {law && law.articles.some((a: any) => a.regulations && a.regulations.length > 0) && (
+      {!isDocumentType && law && law.articles.some((a: any) => a.regulations && a.regulations.length > 0) && (
         <div className="fixed top-20 right-6 z-50">
           <Button
             size="sm"
@@ -846,8 +941,13 @@ export default function LawDetail() {
         </div>
       )}
 
-      {/* Articles List */}
-      <div className="law-content-frame" ref={contentRef}>
+      {/* Document Content (decisions/gazette) — rendered as flowing text, not articles */}
+      {isDocumentType && law && (
+        <DocumentContentView articles={law.articles} allArticles={law.articles} />
+      )}
+
+      {/* Articles List — only for laws and regulations */}
+      {!isDocumentType && <div className="law-content-frame" ref={contentRef}>
         {filteredArticles.length > 0 ? (
           (() => {
             let lastSection = '';
@@ -1594,7 +1694,7 @@ export default function LawDetail() {
             </Button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Error Report Modal */}
       <Dialog 
