@@ -222,6 +222,13 @@ function generatePrefixedForms(baseWords: string[]): string[] {
 
 const TRIGGER_WORDS = generatePrefixedForms(BASE_TRIGGER_WORDS);
 
+// Words that follow "المادة" but indicate substance/material, not a legal article reference
+const NON_ARTICLE_FOLLOWERS = new Set([
+  'الجافة', 'الفعالة', 'الخام', 'السامة', 'الكيميائية', 'العضوية', 'المشعة',
+  'الغذائية', 'الدوائية', 'المخدرة', 'المحظورة', 'الأولية', 'النقية',
+  'البيضاء', 'السوداء', 'الرمادية', 'الصلبة', 'السائلة', 'الغازية',
+]);
+
 // Parse article cross-references (المادة الخامسة، المادتين...) into clickable segments.
 // See: docs/extraction/boe_formatting_playbook.md (sections C, E)
 function parseArticleReferences(text: string, validArticleNumbers: Set<number>): ParsedSegment[] {
@@ -247,7 +254,16 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
     
     // Look at what follows the trigger word
     const remainingText = text.slice(afterTrigger);
-    
+
+    // Skip if this is "المادة" used as substance/material (e.g. "المادة الجافة", "المادة الفعالة")
+    const followerCheck = remainingText.match(/^\s+(\S+)/);
+    if (followerCheck && NON_ARTICLE_FOLLOWERS.has(followerCheck[1])) {
+      segments.push({ type: 'text', content: triggerWord });
+      currentIndex = afterTrigger;
+      triggerPattern.lastIndex = currentIndex;
+      continue;
+    }
+
     // Check for parenthetical reference: (X)
     const parenMatch = remainingText.match(/^(\s*)\(([^)]+)\)/);
     
@@ -348,26 +364,32 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
         const candidateText = nonParenMatch[2].trim();
         const candidateWords = candidateText.split(/\s+/);
 
-        // Try progressively longer prefixes using EXACT dictionary/digit match only
-        // (not includes-based parseArabicArticleNumber which matches substrings).
-        // e.g. "الثامنة عشرة الأشخاص" → "الثامنة"=8, "الثامنة عشرة"=18 → pick 18
-        // e.g. "التاسعة أو المادة" → "التاسعة"=9, "التاسعة أو"=undefined → stop at 9
-        let articleNumber: number | null = null;
-        let numberText = "";
+        // Try progressively longer prefixes using EXACT dictionary/digit match only.
+        // IMPORTANT: First find the LONGEST valid number (e.g. "السادسة عشرة"=16 not "السادسة"=6),
+        // then check if that number exists in the law's articles.
+        // Phase 1: Find the longest matching number text (regardless of validity)
+        let bestParsed: number | null = null;
+        let bestNumberText = "";
         for (let wi = 1; wi <= Math.min(candidateWords.length, 4); wi++) {
           const testText = candidateWords.slice(0, wi).join(' ');
-          // Exact match in dictionary, or direct digit
           const exactMatch = arabicOrdinals[testText];
           const digitMatch = testText.match(/^(\d+)$/) ? parseInt(testText, 10)
             : testText.match(/^([٠-٩]+)$/) ? parseInt(testText.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()), 10)
             : null;
           const parsed = exactMatch ?? digitMatch ?? null;
-          if (parsed !== null && validArticleNumbers.has(parsed)) {
-            articleNumber = parsed;
-            numberText = testText;
-          } else if (articleNumber !== null) {
-            break;
+          if (parsed !== null) {
+            bestParsed = parsed;
+            bestNumberText = testText;
+          } else if (bestParsed !== null) {
+            break; // No longer matches, stop extending
           }
+        }
+        // Phase 2: Validate the longest matched number against this law's articles
+        let articleNumber: number | null = null;
+        let numberText = "";
+        if (bestParsed !== null && validArticleNumbers.has(bestParsed)) {
+          articleNumber = bestParsed;
+          numberText = bestNumberText;
         }
 
         if (articleNumber && numberText) {
