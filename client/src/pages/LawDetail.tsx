@@ -511,7 +511,7 @@ const ORDINAL_REGEX = /^(أولاً|أولًا|ثانياً|ثانيًا|ثال�
 
 function DocumentContentView({ articles, allArticles, lawName }: { articles: any[]; allArticles: any[]; lawName?: string }) {
   // Flatten all paragraphs from all articles into one continuous flow
-  const allParagraphs: { text: string; marker: string; level: number; articleNumber: number }[] = [];
+  const allParagraphs: { text: string; marker: string; level: number; articleNumber: number; paraType?: string; tableRows?: string[][] }[] = [];
 
   // Skip article 0 "مقدمة" if it's just a short title
   for (const article of articles) {
@@ -523,6 +523,11 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
 
     if (article.paragraphs && article.paragraphs.length > 0) {
       for (const para of article.paragraphs) {
+        // Pass through table paragraphs
+        if (para.type === 'table' && para.table_rows) {
+          allParagraphs.push({ text: '', marker: '', level: 0, articleNumber: article.number, paraType: 'table', tableRows: para.table_rows });
+          continue;
+        }
         const marker = (para.marker || '').trim();
         const paraText = (para.text || '').trim();
         if (!marker && !paraText) continue;
@@ -547,6 +552,40 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
           <div className="prose-law">
             {allParagraphs.map((para, idx) => {
               let { text, marker, level, articleNumber } = para;
+
+              // Render table paragraphs
+              if (para.paraType === 'table' && para.tableRows) {
+                const rows = para.tableRows;
+                const hasHeader = rows.length > 1;
+                return (
+                  <div key={idx} className="my-4 overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full border-collapse text-sm" style={{ direction: 'rtl' }}>
+                      {hasHeader && (
+                        <thead>
+                          <tr className="bg-primary/10">
+                            {rows[0].map((cell: string, ci: number) => (
+                              <th key={ci} className="border-b border-border px-4 py-3 text-right font-bold text-primary whitespace-pre-line">
+                                {toHindiNumerals(cell)}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                      )}
+                      <tbody>
+                        {(hasHeader ? rows.slice(1) : rows).map((row: string[], ri: number) => (
+                          <tr key={ri} className={ri % 2 === 0 ? 'bg-muted/30' : 'bg-background'}>
+                            {row.map((cell: string, ci: number) => (
+                              <td key={ci} className="border-b border-border/50 px-4 py-2.5 text-right align-top whitespace-pre-line">
+                                {toHindiNumerals(cell)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
 
               // Detect ordinal markers embedded in text (أولاً: ثانياً: etc.)
               if (!marker) {
