@@ -506,93 +506,82 @@ function StructuredRoyalDecreeSection({ preamble, royalDecree, cabinetDecision }
 
 type OverridesMap = Record<string, { overrideText: string; updatedAt: string; updatedBy: string }>;
 
-/**
- * Renders decisions/gazette content as a single flowing document.
- * Saudi legal documents that are NOT أنظمة (laws) include:
- * - قرارات (decisions): cabinet decisions, ministerial orders, authority resolutions
- * - منشورات (gazette): official announcements, statements
- *
- * These documents have a specific structure:
- * - Article 0 "مقدمة": usually just the title/subject — skip if short
- * - Subsequent "articles": contain the preamble (بناءً على...) and the actual decision text
- * - Numbered items (أولاً، ثانياً...): the substantive provisions of the decision
- *
- * We render them as a single flowing document, respecting the Saudi legal drafting style.
- */
-function DocumentContentView({ articles, allArticles }: { articles: any[]; allArticles: any[] }) {
-  // Filter out article 0 "مقدمة" if it's just a short title (< 80 chars, no paragraphs)
-  const contentArticles = articles.filter((a: any) => {
-    if (a.number === 0 && a.number_text === 'مقدمة') {
-      const text = (a.text || '').trim();
-      const hasParagraphs = a.paragraphs && a.paragraphs.length > 1;
-      if (text.length < 80 && !hasParagraphs) return false;
+// Regex to detect Arabic ordinal markers at the start of text: أولاً: ثانياً: etc.
+const ORDINAL_REGEX = /^(أولاً|ثانياً|ثالثاً|رابعاً|خامساً|سادساً|سابعاً|ثامناً|تاسعاً|عاشراً|حادي عشر|ثاني عشر|ثالث عشر|رابع عشر|خامس عشر)\s*[:\u200F]/;
+
+function DocumentContentView({ articles, allArticles, lawName }: { articles: any[]; allArticles: any[]; lawName?: string }) {
+  // Flatten all paragraphs from all articles into one continuous flow
+  const allParagraphs: { text: string; marker: string; level: number; articleNumber: number }[] = [];
+
+  // Skip article 0 "مقدمة" if it's just a short title
+  for (const article of articles) {
+    if (article.number === 0 && article.number_text === 'مقدمة') {
+      const text = (article.text || '').trim();
+      const hasParagraphs = article.paragraphs && article.paragraphs.length > 1;
+      if (text.length < 80 && !hasParagraphs) continue;
     }
-    return true;
-  });
+
+    if (article.paragraphs && article.paragraphs.length > 0) {
+      for (const para of article.paragraphs) {
+        const marker = (para.marker || '').trim();
+        const paraText = (para.text || '').trim();
+        if (!marker && !paraText) continue;
+        allParagraphs.push({ text: paraText, marker, level: para.level || 0, articleNumber: article.number });
+      }
+    } else if (article.text) {
+      for (const line of article.text.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        allParagraphs.push({ text: trimmed, marker: '', level: 0, articleNumber: article.number });
+      }
+    }
+  }
 
   return (
     <div className="law-content-frame">
-      <div className="space-y-4">
-        {contentArticles.map((article: any, idx: number) => {
-          const text = article.text || "";
-          const hasParagraphs = article.paragraphs && article.paragraphs.length > 0;
+      {lawName && (
+        <h1 className="text-xl font-bold text-foreground mb-6 text-center leading-relaxed">{lawName}</h1>
+      )}
+      <div className="article-container">
+        <div className="article-text-wrapper">
+          <div className="prose-law space-y-2">
+            {allParagraphs.map((para, idx) => {
+              let { text, marker, level, articleNumber } = para;
 
-          return (
-            <div key={idx} className="article-container">
-              <div className="article-text-wrapper">
-                <div className="prose-law">
-                  {hasParagraphs ? (
-                    <div className="space-y-2">
-                      {article.paragraphs.map((para: any, pIdx: number) => {
-                        const marker = (para.marker || "").trim();
-                        const paraText = (para.text || "").trim();
-                        if (!marker && !paraText) return null;
+              // Detect ordinal markers embedded in text (أولاً: ثانياً: etc.)
+              if (!marker) {
+                const ordinalMatch = text.match(ORDINAL_REGEX);
+                if (ordinalMatch) {
+                  marker = ordinalMatch[0];
+                  text = text.slice(marker.length).trim();
+                  level = 0;
+                }
+              }
 
-                        if (marker) {
-                          return (
-                            <NumberedItem key={pIdx} marker={marker} level={para.level || 0}>
-                              <ArticleReferenceText
-                                text={paraText}
-                                articles={allArticles}
-                                currentArticleNumber={article.number}
-                              />
-                            </NumberedItem>
-                          );
-                        }
+              if (marker) {
+                return (
+                  <NumberedItem key={idx} marker={marker} level={level}>
+                    <ArticleReferenceText
+                      text={text}
+                      articles={allArticles}
+                      currentArticleNumber={articleNumber}
+                    />
+                  </NumberedItem>
+                );
+              }
 
-                        return (
-                          <p key={pIdx} className="text-justify">
-                            <ArticleReferenceText
-                              text={paraText}
-                              articles={allArticles}
-                              currentArticleNumber={article.number}
-                            />
-                          </p>
-                        );
-                      })}
-                    </div>
-                  ) : text ? (
-                    <div className="space-y-2">
-                      {text.split('\n').map((line: string, lIdx: number) => {
-                        const trimmed = line.trim();
-                        if (!trimmed) return null;
-                        return (
-                          <p key={lIdx} className="text-justify">
-                            <ArticleReferenceText
-                              text={trimmed}
-                              articles={allArticles}
-                              currentArticleNumber={article.number}
-                            />
-                          </p>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+              return (
+                <p key={idx} className="text-justify">
+                  <ArticleReferenceText
+                    text={text}
+                    articles={allArticles}
+                    currentArticleNumber={articleNumber}
+                  />
+                </p>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -943,7 +932,7 @@ export default function LawDetail() {
 
       {/* Document Content (decisions/gazette) — rendered as flowing text, not articles */}
       {isDocumentType && law && (
-        <DocumentContentView articles={law.articles} allArticles={law.articles} />
+        <DocumentContentView articles={law.articles} allArticles={law.articles} lawName={law.law_name || law.title_ar} />
       )}
 
       {/* Articles List — only for laws and regulations */}
