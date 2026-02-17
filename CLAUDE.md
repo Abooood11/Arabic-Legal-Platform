@@ -27,6 +27,7 @@
 
 | التاريخ | الملخص |
 |---------|--------|
+| 2026-02-17 | إصلاح جذري لإحالات المواد: استبدال الحد الثابت 721 بـ `validArticleNumbers.has()` + توسيع ordinals في referenceScanner |
 | 2026-02-17 | إصلاح عرض الوثائق غير القانونية (قرارات/تعاميم/لوائح) بدون تقسيم مواد — `isDocumentType = category !== 'law'` |
 | 2026-02-17 | إصلاح Gemini API timeout + retry + batch logging + fingerprint composite index |
 | 2026-02-16 | نظام المراجعة الشاملة الذكية (Pre-Launch Audit) بـ Gemini AI + 6 ماسحات + لوحة تحكم |
@@ -187,6 +188,13 @@ npm run check    # فحص TypeScript
 
 ### 8.6 تنظيف أحكام BOG (OCR)
 - **الحل:** `judgment-parser.ts` — إصلاح تواريخ، إزالة تسريب أحكام مدمجة، هيئة التثقيف→التدقيق
+
+### 8.7 إحالات مواد وهمية — الحد الثابت 721 (2026-02-17)
+- **المشكلة:** `parseArticleReferences` كان يستخدم `num >= 1 && num <= 721` للتحقق — يسبب إحالات وهمية (نظام بـ 20 مادة يُظهر رابط للمادة 200) وإحالات مفقودة (نظام بـ 800 مادة يُهمل ما فوق 721)
+- **السبب:** الحد الثابت 721 (عدد مواد نظام المعاملات المدنية) بدل التحقق من المواد الفعلية
+- **الحل:** `validArticleNumbers = new Set(articles.map(a => a.number))` + `validArticleNumbers.has(num)` في كل الأماكن الخمسة
+- **الملفات:** `ArticleReferenceText.tsx`, `referenceScanner.ts`
+- **إضافي:** توسيع ordinals في referenceScanner من 20 إلى 100+
 
 ---
 
