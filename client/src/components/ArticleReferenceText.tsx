@@ -17,6 +17,8 @@ interface ArticleReferenceTextProps {
   nestingLevel?: number;
   maxNestingLevel?: number;
   isDefinitionContext?: boolean;
+  /** Name of the current law (e.g. "نظام المعالجات التجارية") for resolving unnamed references like "من اللائحة" */
+  lawName?: string;
 }
 
 /** Detect if text starts with a short definition term followed by `:`.
@@ -162,7 +164,8 @@ interface ParsedSegment {
   content: string;
   articleNumber?: number;
   hasParentheses?: boolean;
-  externalLawName?: string;  // For external references: the law name mentioned in text
+  externalLawName?: string;       // For named external: "نظام المعالجات التجارية"
+  unnamedKeyword?: string;         // For unnamed external: "اللائحة", "النظام" (to resolve from context)
 }
 
 // Base trigger words for article references
@@ -230,16 +233,58 @@ const NON_ARTICLE_FOLLOWERS = new Set([
   'البيضاء', 'السوداء', 'الرمادية', 'الصلبة', 'السائلة', 'الغازية',
 ]);
 
-// Regex to detect external law references AFTER the article number.
-// Matches: "من نظام X" / "من لائحة X" / "من تنظيم X" / "من قانون X" / "من مرسوم X" / "من قرار X"
-// Does NOT match: "من هذا النظام" / "من هذه اللائحة" (self-references to current law → keep link)
-// Also matches: "من النظام" / "من اللائحة" (definite form, refers to a specific external law mentioned in context)
-// Regex to detect external law references AFTER the article number.
-// Captures the full law name: "من نظام المعالجات التجارية في التجارة الدولية" → "نظام المعالجات التجارية في التجارة الدولية"
-// The law name extends until a sentence boundary (comma, period, etc.) or end of text.
-const EXTERNAL_LAW_KEYWORDS = 'نظام|لائحة|تنظيم|قانون|مرسوم|قرار|النظام|اللائحة|التنظيم|القانون|المرسوم|القرار';
-const EXTERNAL_LAW_PATTERN = new RegExp(`^\\s+من\\s+((?:${EXTERNAL_LAW_KEYWORDS})(?:\\s+[^،,؛;.!؟?\\n]+)?)`);
+// ─── External law reference detection ───────────────────────────
+//
+// Three categories of "المادة X من ___":
+//
+// 1. SELF-REFERENCE: "من هذا النظام" / "من هذه اللائحة"
+//    → Keep internal link (article X of current law)
+//
+// 2. NAMED EXTERNAL: "من نظام المعالجات التجارية" / "من لائحة الخدمة المدنية"
+//    → indefinite keyword + specific name → search library → external blue link
+//    Pattern: من + (نظام|لائحة|...) + NAME (at least one more word)
+//
+// 3. UNNAMED EXTERNAL: "من النظام" / "من اللائحة" / "من القانون"
+//    → definite keyword WITHOUT a specific name → can't determine which law
+//    → Don't link (show as plain text) — do NOT create wrong internal link either
+//
+// IMPORTANT: "من النظام" (definite, no name) ≠ "من نظام X" (indefinite + name).
+// "من اللائحة" likely refers to the regulation of THIS law or one mentioned in context.
+
+// Matches "من النظام/اللائحة/..." (definite form, no specific name = ambiguous, skip linking)
+const UNNAMED_EXTERNAL_PATTERN = /^\s+من\s+(النظام|اللائحة|التنظيم|القانون|المرسوم|القرار)(?:\s*[،,؛;.!؟?\n]|\s*$)/;
+
+// Matches "من نظام X" / "من لائحة Y" (indefinite + name = identifiable external law)
+const NAMED_EXTERNAL_KEYWORDS = 'نظام|لائحة|تنظيم|قانون|مرسوم|قرار';
+const NAMED_EXTERNAL_PATTERN = new RegExp(`^\\s+من\\s+((?:${NAMED_EXTERNAL_KEYWORDS})\\s+[^،,؛;.!؟?\\n]+)`);
+
+// Matches self-reference: "من هذا النظام" / "من هذه اللائحة"
 const SELF_REFERENCE_PATTERN = /^\s+من\s+هذ[اه]\s+(النظام|اللائحة|التنظيم|القانون|المرسوم|القرار)/;
+
+/** Check text after article number and classify the reference type */
+function classifyReference(afterNumber: string): {
+  type: 'self' | 'named_external' | 'unnamed_external' | 'internal';
+  externalLawName?: string;
+  unnamedKeyword?: string;  // e.g. "اللائحة", "النظام" — for smart resolution
+  matchLength?: number;
+} {
+  // 1. Self-reference: "من هذا النظام"
+  if (SELF_REFERENCE_PATTERN.test(afterNumber)) {
+    return { type: 'self' };
+  }
+  // 2. Named external: "من نظام المعالجات التجارية"
+  const namedMatch = afterNumber.match(NAMED_EXTERNAL_PATTERN);
+  if (namedMatch) {
+    return { type: 'named_external', externalLawName: namedMatch[1].trim(), matchLength: namedMatch[0].length };
+  }
+  // 3. Unnamed external: "من اللائحة" / "من النظام" (no specific name — resolve from context)
+  const unnamedMatch = afterNumber.match(UNNAMED_EXTERNAL_PATTERN);
+  if (unnamedMatch) {
+    return { type: 'unnamed_external', unnamedKeyword: unnamedMatch[1], matchLength: unnamedMatch[0].length };
+  }
+  // 4. Internal reference (no "من" pattern)
+  return { type: 'internal' };
+}
 
 // Parse article cross-references (المادة الخامسة، المادتين...) into clickable segments.
 // See: docs/extraction/boe_formatting_playbook.md (sections C, E)
@@ -315,20 +360,30 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
         if (anyValid) {
           // Check for external law reference after the parenthetical group
           const afterMultiParen = text.slice(afterTrigger + parenMatch[0].length);
-          const isMultiSelfRef = SELF_REFERENCE_PATTERN.test(afterMultiParen);
-          const isMultiExternalRef = !isMultiSelfRef && EXTERNAL_LAW_PATTERN.test(afterMultiParen);
+          const multiRef = classifyReference(afterMultiParen);
 
-          if (isMultiExternalRef) {
-            const multiExternalMatch = afterMultiParen.match(EXTERNAL_LAW_PATTERN);
-            const multiExternalLawName = multiExternalMatch ? multiExternalMatch[1].trim() : '';
+          if (multiRef.type === 'named_external') {
             const fullMultiRefText = triggerWord + parenMatch[0];
-            const multiFromText = multiExternalMatch ? multiExternalMatch[0] : '';
+            const fromText = afterMultiParen.slice(0, multiRef.matchLength || 0);
             segments.push({
               type: 'external_reference',
-              content: fullMultiRefText + multiFromText,
-              externalLawName: multiExternalLawName
+              content: fullMultiRefText + fromText,
+              externalLawName: multiRef.externalLawName
             });
-            currentIndex = afterTrigger + parenMatch[0].length + multiFromText.length;
+            currentIndex = afterTrigger + parenMatch[0].length + (multiRef.matchLength || 0);
+            triggerPattern.lastIndex = currentIndex;
+            continue;
+          }
+          if (multiRef.type === 'unnamed_external') {
+            // "من اللائحة" / "من النظام" — resolve from context using current law name
+            const fullMultiUnnamedText = triggerWord + parenMatch[0];
+            const multiUnnamedFromText = afterMultiParen.slice(0, multiRef.matchLength || 0);
+            segments.push({
+              type: 'external_reference',
+              content: fullMultiUnnamedText + multiUnnamedFromText,
+              unnamedKeyword: multiRef.unnamedKeyword
+            });
+            currentIndex = afterTrigger + parenMatch[0].length + (multiRef.matchLength || 0);
             triggerPattern.lastIndex = currentIndex;
             continue;
           }
@@ -347,21 +402,32 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
         // Check for external law reference first (before internal validation)
         if (articleNumber) {
           const afterParen = text.slice(afterTrigger + parenMatch[0].length);
-          const isParenSelfRef = SELF_REFERENCE_PATTERN.test(afterParen);
-          const isParenExternalRef = !isParenSelfRef && EXTERNAL_LAW_PATTERN.test(afterParen);
+          const parenRef = classifyReference(afterParen);
 
-          if (isParenExternalRef) {
-            const parenExternalMatch = afterParen.match(EXTERNAL_LAW_PATTERN);
-            const parenExternalLawName = parenExternalMatch ? parenExternalMatch[1].trim() : '';
+          if (parenRef.type === 'named_external') {
             const fullParenRefText = triggerWord + parenMatch[0];
-            const parenFromText = parenExternalMatch ? parenExternalMatch[0] : '';
+            const parenFromText = afterParen.slice(0, parenRef.matchLength || 0);
             segments.push({
               type: 'external_reference',
               content: fullParenRefText + parenFromText,
               articleNumber,
-              externalLawName: parenExternalLawName
+              externalLawName: parenRef.externalLawName
             });
-            currentIndex = afterTrigger + parenMatch[0].length + parenFromText.length;
+            currentIndex = afterTrigger + parenMatch[0].length + (parenRef.matchLength || 0);
+            triggerPattern.lastIndex = currentIndex;
+            continue;
+          }
+          if (parenRef.type === 'unnamed_external') {
+            // "من اللائحة" / "من النظام" — resolve from context
+            const fullParenUnnamedText = triggerWord + parenMatch[0];
+            const parenUnnamedFromText = afterParen.slice(0, parenRef.matchLength || 0);
+            segments.push({
+              type: 'external_reference',
+              content: fullParenUnnamedText + parenUnnamedFromText,
+              articleNumber,
+              unnamedKeyword: parenRef.unnamedKeyword
+            });
+            currentIndex = afterTrigger + parenMatch[0].length + (parenRef.matchLength || 0);
             triggerPattern.lastIndex = currentIndex;
             continue;
           }
@@ -440,29 +506,42 @@ function parseArticleReferences(text: string, validArticleNumbers: Set<number>):
           }
         }
         // Phase 2: Check for EXTERNAL law reference first (must happen before internal validation!)
-        // "المادة الرابعة من نظام المعالجات التجارية" should link to external law regardless of whether
-        // article 4 exists in the current law or not.
+        // "المادة الرابعة من نظام المعالجات التجارية" → named external → blue link
+        // "المادة العاشرة من اللائحة" → unnamed external → plain text (can't determine which)
+        // "المادة الخامسة من هذا النظام" → self-reference → internal link
         if (bestParsed !== null) {
           const afterNumber = text.slice(afterTrigger + whitespace.length + bestNumberText.length);
-          const isSelfRef = SELF_REFERENCE_PATTERN.test(afterNumber);
-          const isExternalRef = !isSelfRef && EXTERNAL_LAW_PATTERN.test(afterNumber);
+          const refClass = classifyReference(afterNumber);
 
-          if (isExternalRef) {
-            // External law reference — create a special segment with the external law name
-            const externalMatch = afterNumber.match(EXTERNAL_LAW_PATTERN);
-            const externalLawName = externalMatch ? externalMatch[1].trim() : '';
+          if (refClass.type === 'named_external') {
+            // Named external: "من نظام المعالجات التجارية" → create external link
             const fullRefText = triggerWord + whitespace + bestNumberText;
-            const fromText = externalMatch ? externalMatch[0] : '';
+            const fromText = afterNumber.slice(0, refClass.matchLength || 0);
             segments.push({
               type: 'external_reference',
               content: fullRefText + fromText,
               articleNumber: bestParsed,
-              externalLawName
+              externalLawName: refClass.externalLawName
             });
-            currentIndex = afterTrigger + whitespace.length + bestNumberText.length + fromText.length;
+            currentIndex = afterTrigger + whitespace.length + bestNumberText.length + (refClass.matchLength || 0);
             triggerPattern.lastIndex = currentIndex;
             continue;
           }
+          if (refClass.type === 'unnamed_external') {
+            // Unnamed external: "من اللائحة" / "من النظام" → resolve from context using law name
+            const fullUnnamedRefText = triggerWord + whitespace + bestNumberText;
+            const unnamedFromText = afterNumber.slice(0, refClass.matchLength || 0);
+            segments.push({
+              type: 'external_reference',
+              content: fullUnnamedRefText + unnamedFromText,
+              articleNumber: bestParsed,
+              unnamedKeyword: refClass.unnamedKeyword
+            });
+            currentIndex = afterTrigger + whitespace.length + bestNumberText.length + (refClass.matchLength || 0);
+            triggerPattern.lastIndex = currentIndex;
+            continue;
+          }
+          // 'self' and 'internal' fall through to Phase 3 (internal validation)
         }
 
         // Phase 3: Validate the longest matched number against this law's articles (internal reference)
@@ -609,18 +688,17 @@ function loadLibraryCache(): Promise<LibraryCacheEntry[]> {
 function findLawByName(name: string, cache: LibraryCacheEntry[]): LibraryCacheEntry | null {
   if (!name || !cache.length) return null;
 
-  // Normalize: remove "ال" prefix variations from type words for better matching
   const normalized = name.trim();
 
   // 1. Exact match on title
   const exact = cache.find(c => c.title_ar === normalized);
   if (exact) return exact;
 
-  // 2. Library title contains the referenced name (e.g. title="نظام المعالجات التجارية في التجارة الدولية" contains "نظام المعالجات التجارية")
+  // 2. Library title contains the referenced name
   const contained = cache.find(c => c.title_ar.includes(normalized));
   if (contained) return contained;
 
-  // 3. Referenced name contains library title (e.g. "نظام المعالجات التجارية في التجارة الدولية" contains title="نظام المعالجات التجارية")
+  // 3. Referenced name contains library title
   const containing = cache.find(c => normalized.includes(c.title_ar) && c.title_ar.length > 10);
   if (containing) return containing;
 
@@ -634,15 +712,234 @@ function findLawByName(name: string, cache: LibraryCacheEntry[]): LibraryCacheEn
   return null;
 }
 
+/**
+ * Extract ALL inline definitions from the law's articles.
+ * Scans ALL articles (not just Article 1) for two patterns:
+ *
+ * Pattern A (colon): "النظام : نظام المعالجات التجارية." (Article 1 of most BOE laws)
+ * Pattern B (inline): 'نظام المعالجات التجارية "النظام"' (any article, e.g. uqn_28552)
+ *
+ * Returns a map: { "النظام": "نظام المعالجات التجارية في التجارة الدولية", "اللائحة": "اللائحة التنفيذية للنظام", ... }
+ */
+function extractDefinitionsMap(articles: Article[]): Record<string, string> {
+  const defs: Record<string, string> = {};
+  const aliasKeywords = ['النظام', 'اللائحة', 'التنظيم', 'القانون', 'المرسوم', 'القرار', 'الهيئة', 'الوكالة', 'المركز', 'المجلس'];
+
+  // Pattern A: Colon-based (Article 0-1 only) — "الكلمة : التعريف."
+  // ONLY match actual colon (:) separator, NOT quotes — quotes are handled by Pattern B
+  for (const art of articles.filter(a => a.number <= 1)) {
+    const text = art.text || '';
+    for (const kw of aliasKeywords) {
+      if (defs[kw]) continue;
+      const colonRe = new RegExp(`${kw}\\s*:\\s*([^.،]+)`, 'g');
+      const m = colonRe.exec(text);
+      if (m) {
+        const val = m[1].trim().replace(/["\u201C\u201D\u200F]/g, '');
+        if (val.length > 5) defs[kw] = val;
+      }
+    }
+  }
+
+  // Pattern B: Inline alias (ALL articles) — 'FULL_NAME "الكلمة"'
+  // The full name appears BEFORE the quoted alias.
+  // e.g. 'نظام المعالجات التجارية في التجارة الدولية "النظام"'
+  // e.g. 'اللائحة التنفيذية للنظام "اللائحة"'
+  for (const art of articles) {
+    const text = art.text || '';
+    for (const kw of aliasKeywords) {
+      if (defs[kw]) continue;
+      const inlineRe = new RegExp(
+        `([^\u201C\u201D"'،.\\n]{3,100})\\s*["\u201C\u201D]${kw}["\u201C\u201D]`,
+        'g'
+      );
+      const m = inlineRe.exec(text);
+      if (m) {
+        let fullName = m[1].trim();
+        // Strip "المادة X من" prefix: "المادة الرابعة  من نظام X" → "نظام X"
+        const strip = fullName.match(
+          /(?:من|وفق|بموجب|في)\s+((?:نظام|لائحة|تنظيم|قانون|مرسوم|قرار|اللائحة|النظام|هيئة|وكالة|مركز|مجلس)\s+.+)/
+        );
+        if (strip) {
+          fullName = strip[1].trim();
+        } else {
+          const typeExtract = fullName.match(
+            /((?:نظام|لائحة|تنظيم|قانون|مرسوم|قرار|اللائحة|النظام|هيئة|وكالة)\s+[^\u201C\u201D"']+)/
+          );
+          if (typeExtract) fullName = typeExtract[1].trim();
+        }
+        if (fullName.length > 5) defs[kw] = fullName;
+      }
+    }
+  }
+
+  return defs;
+}
+
+// Module-level cache for definitions per law (keyed by first article text hash)
+let _defsCache: { key: string; defs: Record<string, string> } | null = null;
+
+function getDefinitionsMap(articles: Article[]): Record<string, string> {
+  // Simple cache key: article count + first article text length
+  const key = `${articles.length}_${(articles[0]?.text || '').length}`;
+  if (_defsCache && _defsCache.key === key) return _defsCache.defs;
+  const defs = extractDefinitionsMap(articles);
+  _defsCache = { key, defs };
+  return defs;
+}
+
+/**
+ * Smart resolution for unnamed references like "من اللائحة" / "من النظام".
+ *
+ * Multi-strategy approach (ordered by reliability):
+ *
+ * Strategy 0: Extract definitions from the law's articles (colon + inline patterns)
+ *             Then resolve back-references (e.g. "للنظام" → expand using "النظام" definition)
+ * Strategy 1: Name-based search — use current law name to find related documents
+ *
+ * Works across ALL 3900+ laws on the platform.
+ */
+function resolveUnnamedReference(
+  keyword: string, // "النظام", "اللائحة", "القانون", etc.
+  currentLawName: string,
+  cache: LibraryCacheEntry[],
+  articles?: Article[]  // ALL articles of the current law
+): LibraryCacheEntry | null {
+  if (!cache.length) return null;
+
+  // ── Strategy 0: Definition-based resolution ──
+  if (articles && articles.length > 0) {
+    const defs = getDefinitionsMap(articles);
+    let definedName = defs[keyword];
+
+    if (definedName) {
+      // Check if the definition contains a back-reference like "للنظام" / "لهذا النظام"
+      // e.g. "اللائحة التنفيذية للنظام" where "للنظام" = "for THIS law"
+      // IMPORTANT: Try to expand back-references FIRST, because a direct match on
+      // a generic name like "اللائحة التنفيذية للنظام" will match the WRONG law.
+      const backRefPatterns: Array<{ pattern: RegExp; refKeyword: string; preposition: string }> = [
+        { pattern: /لهذا النظام/, refKeyword: 'النظام', preposition: 'لنظام' },
+        { pattern: /للنظام/, refKeyword: 'النظام', preposition: 'لنظام' },
+        { pattern: /لهذه اللائحة/, refKeyword: 'اللائحة', preposition: 'للائحة' },
+        { pattern: /للائحة/, refKeyword: 'اللائحة', preposition: 'للائحة' },
+        { pattern: /لهذا التنظيم/, refKeyword: 'التنظيم', preposition: 'لتنظيم' },
+        { pattern: /للتنظيم/, refKeyword: 'التنظيم', preposition: 'لتنظيم' },
+      ];
+
+      let hasBackRef = false;
+      for (const br of backRefPatterns) {
+        if (br.pattern.test(definedName) && br.refKeyword !== keyword) {
+          hasBackRef = true;
+          const refName = defs[br.refKeyword];
+          if (refName) {
+            // Expand: "اللائحة التنفيذية للنظام" → "اللائحة التنفيذية لنظام المعالجات التجارية..."
+            const expanded = definedName.replace(br.pattern, `ل${refName}`);
+            const expandedFound = findLawByName(expanded, cache);
+            // Validate: the result's type must match the definition's type
+            // e.g. if definition is "اللائحة التنفيذية", result must contain "لائحة" not just "نظام"
+            const defFirstWord = definedName.split(/\s+/)[0]; // "اللائحة"
+            if (expandedFound && expandedFound.title_ar.includes(defFirstWord.replace(/^ال/, ''))) {
+              return expandedFound;
+            }
+
+            // Topic-based search: title contains "اللائحة التنفيذية" AND contains "المعالجات التجارية"
+            const refTopic = refName.replace(/^(?:نظام|لائحة|تنظيم|قانون|مرسوم|قرار)\s+/, '');
+            if (refTopic.length > 5) {
+              const typePrefix = definedName.split(/\s+/).slice(0, 2).join(' ');
+              const topicFound = cache.find(c =>
+                c.title_ar.includes(typePrefix) && c.title_ar.includes(refTopic)
+              );
+              if (topicFound) return topicFound;
+            }
+          } else if (currentLawName) {
+            // No definition for the referenced keyword — use current law name as fallback
+            // e.g. "اللائحة : اللائحة التنفيذية لهذا النظام" but no "النظام" definition
+            // → use currentLawName to extract topic
+            const coreMatch = currentLawName.match(/^(?:نظام|لائحة|تنظيم|قانون|مرسوم|قرار)\s+(.+)/);
+            if (coreMatch) {
+              const topic = coreMatch[1];
+              const typePrefix = definedName.split(/\s+/).slice(0, 2).join(' ');
+              const fallbackFound = cache.find(c =>
+                c.title_ar.includes(typePrefix) && c.title_ar.includes(topic)
+              );
+              if (fallbackFound) return fallbackFound;
+              // Also try shorter topic
+              const shortTopic = topic.split(/\s+/).slice(0, 3).join(' ');
+              if (shortTopic.length > 5) {
+                const shortFound = cache.find(c =>
+                  c.title_ar.includes(typePrefix) && c.title_ar.includes(shortTopic)
+                );
+                if (shortFound) return shortFound;
+              }
+            }
+          }
+          break;
+        }
+      }
+
+      // If no back-reference, try direct match in library
+      if (!hasBackRef) {
+        const directFound = findLawByName(definedName, cache);
+        if (directFound) return directFound;
+      }
+    }
+  }
+
+  // ── Strategy 1: Name-based search using current law name ──
+  if (!currentLawName) return null;
+
+  // Extract the core topic from the current law name
+  const coreTopicMatch = currentLawName.match(/^(?:نظام|لائحة|تنظيم|قانون|مرسوم|قرار)\s+(.+)/);
+  const coreTopic = coreTopicMatch ? coreTopicMatch[1] : currentLawName;
+  const shortTopic = coreTopic.split(/\s+/).slice(0, 3).join(' ');
+
+  // Determine what type of document we're looking for based on keyword
+  const searchTypes: string[] = [];
+  if (keyword === 'اللائحة' || keyword === 'التنظيم') {
+    searchTypes.push('لائحة', 'اللائحة التنفيذية', 'تنظيم');
+  } else if (keyword === 'النظام' || keyword === 'القانون') {
+    searchTypes.push('نظام', 'قانون');
+  } else if (keyword === 'المرسوم') {
+    searchTypes.push('مرسوم');
+  } else if (keyword === 'القرار') {
+    searchTypes.push('قرار');
+  }
+
+  // 1a. Search for "لائحة [core topic]" or "نظام [core topic]"
+  for (const type of searchTypes) {
+    const searchName = `${type} ${coreTopic}`;
+    const found = cache.find(c => c.title_ar.includes(searchName));
+    if (found) return found;
+  }
+
+  // 1b. Search for "اللائحة التنفيذية لنظام [core topic]"
+  if (keyword === 'اللائحة' || keyword === 'التنظيم') {
+    const execRegSearch = cache.find(c =>
+      c.title_ar.includes('اللائحة التنفيذية') && c.title_ar.includes(shortTopic)
+    );
+    if (execRegSearch) return execRegSearch;
+  }
+
+  // 1c. Fuzzy: any document containing the short topic with the right type prefix
+  for (const type of searchTypes) {
+    const found = cache.find(c =>
+      c.title_ar.startsWith(type) && c.title_ar.includes(shortTopic) && shortTopic.length > 5
+    );
+    if (found) return found;
+  }
+
+  return null;
+}
+
 interface ExpandedArticlePanelProps {
   article: Article;
   articles: Article[];
   nestingLevel: number;
   maxNestingLevel: number;
   onClose: () => void;
+  lawName?: string;
 }
 
-function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel, onClose }: ExpandedArticlePanelProps) {
+function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel, onClose, lawName }: ExpandedArticlePanelProps) {
   return (
     <div 
       className="mt-2 mb-3 bg-slate-50 dark:bg-slate-900/50 border-r-4 border-primary/40 rounded-md p-4 shadow-sm animate-in slide-in-from-top-2 duration-300 ring-1 ring-slate-200 dark:ring-slate-800"
@@ -801,6 +1098,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                           currentArticleNumber={article.number}
                           nestingLevel={nestingLevel + 1}
                           maxNestingLevel={maxNestingLevel}
+                          lawName={lawName}
                         />
                       ) : (
                         <span>{toHindiNumerals(vp.text)}</span>
@@ -831,6 +1129,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                         nestingLevel={nestingLevel + 1}
                         maxNestingLevel={maxNestingLevel}
                         isDefinitionContext={vp.dataLevel === 0 && !vp.marker}
+                        lawName={lawName}
                       />
                     ) : (
                       toHindiNumerals(vp.text)
@@ -849,6 +1148,7 @@ function ExpandedArticlePanel({ article, articles, nestingLevel, maxNestingLevel
                 currentArticleNumber={article.number}
                 nestingLevel={nestingLevel + 1}
                 maxNestingLevel={maxNestingLevel}
+                lawName={lawName}
               />
             ) : (
               toHindiNumerals(article.text)
@@ -866,7 +1166,8 @@ export function ArticleReferenceText({
   currentArticleNumber,
   nestingLevel = 0,
   maxNestingLevel = 2,
-  isDefinitionContext = false
+  isDefinitionContext = false,
+  lawName
 }: ArticleReferenceTextProps) {
   // Track expanded articles by article number only (not segment index) to avoid duplicates
   const [expandedArticles, setExpandedArticles] = useState<Record<number, boolean>>({});
@@ -978,7 +1279,15 @@ export function ArticleReferenceText({
           
           // External law reference — show as link to external law page
           if (segment.type === 'external_reference') {
-            const externalLaw = segment.externalLawName ? findLawByName(segment.externalLawName, libCache) : null;
+            // Try to find the external law: named first, then unnamed (smart resolution)
+            let externalLaw: LibraryCacheEntry | null = null;
+            if (segment.externalLawName) {
+              externalLaw = findLawByName(segment.externalLawName, libCache);
+            } else if (segment.unnamedKeyword && lawName) {
+              // Smart resolution: "من اللائحة" + current law "نظام X" → find "لائحة X"
+              externalLaw = resolveUnnamedReference(segment.unnamedKeyword, lawName, libCache, articles);
+            }
+
             if (externalLaw) {
               // Found the external law — create a link to it
               const articleParam = segment.articleNumber ? `#article-${segment.articleNumber}` : '';
@@ -1066,6 +1375,7 @@ export function ArticleReferenceText({
                   nestingLevel={nestingLevel}
                   maxNestingLevel={maxNestingLevel}
                   onClose={() => toggleReference(articleNumber)}
+                  lawName={lawName}
                 />
               );
             })}

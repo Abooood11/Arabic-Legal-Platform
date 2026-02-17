@@ -605,6 +605,7 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
                         text={text}
                         articles={allArticles}
                         currentArticleNumber={articleNumber}
+                        lawName={lawName}
                       />
                     </NumberedItem>
                   </div>
@@ -617,6 +618,7 @@ function DocumentContentView({ articles, allArticles, lawName }: { articles: any
                     text={text}
                     articles={allArticles}
                     currentArticleNumber={articleNumber}
+                    lawName={lawName}
                   />
                 </p>
               );
@@ -1108,6 +1110,7 @@ export default function LawDetail() {
                                     text={alphaMarkerMatch[2].trim()}
                                     articles={law.articles}
                                     currentArticleNumber={article.number}
+                                    lawName={law.law_name || law.title_ar}
                                   />
                                 </span>
                               </p>
@@ -1123,6 +1126,7 @@ export default function LawDetail() {
                                     text={numMarkerMatch[2].trim()}
                                     articles={law.articles}
                                     currentArticleNumber={article.number}
+                                    lawName={law.law_name || law.title_ar}
                                   />
                                 </span>
                               </p>
@@ -1135,6 +1139,7 @@ export default function LawDetail() {
                                 text={trimmed}
                                 articles={law.articles}
                                 currentArticleNumber={article.number}
+                                lawName={law.law_name || law.title_ar}
                               />
                             </p>
                           );
@@ -1153,6 +1158,7 @@ export default function LawDetail() {
                                 text={trimmed}
                                 articles={law.articles}
                                 currentArticleNumber={article.number}
+                                lawName={law.law_name || law.title_ar}
                               />
                             </p>
                           );
@@ -1361,6 +1367,7 @@ export default function LawDetail() {
                                     text={text}
                                     articles={law.articles}
                                     currentArticleNumber={article.number}
+                                    lawName={law.law_name || law.title_ar}
                                   />
                                 </NumberedItem>
                               );
@@ -1390,6 +1397,7 @@ export default function LawDetail() {
                                   articles={law.articles}
                                   currentArticleNumber={article.number}
                                   isDefinitionContext={vp.dataLevel === 0 && !vp.marker}
+                                  lawName={law.law_name || law.title_ar}
                                 />
                               </div>
                             );
@@ -1401,6 +1409,7 @@ export default function LawDetail() {
                         text={article.text}
                         articles={law.articles}
                         currentArticleNumber={article.number}
+                        lawName={law.law_name || law.title_ar}
                       />
                     )}
                       </div>
@@ -1565,6 +1574,7 @@ export default function LawDetail() {
                                         text={reg.text}
                                         articles={law.articles}
                                         currentArticleNumber={article.number}
+                                        lawName={law.law_name || law.title_ar}
                                       />
                                       
                                       {reg.sub_items && reg.sub_items.length > 0 && (
@@ -1581,6 +1591,7 @@ export default function LawDetail() {
                                                 text={sub.text}
                                                 articles={law.articles}
                                                 currentArticleNumber={article.number}
+                                                lawName={law.law_name || law.title_ar}
                                               />
                                             </NumberedItem>
                                           ))}
