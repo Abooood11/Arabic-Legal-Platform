@@ -1,5 +1,5 @@
 // Onboarding: see /docs/onboarding (VISION, DOMAIN, ARCHITECTURE, DATA_CONTRACTS, DEBUG_PLAYBOOK)
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { X, ExternalLink } from "lucide-react";
 import { NumberedItem } from "./NumberedItem";
 
@@ -1225,15 +1225,15 @@ export function ArticleReferenceText({
     }
     const parts = content.split(/\n+/);
     if (parts.length === 1) {
-      return <span>{toHindiNumerals(content)}</span>;
+      return <>{toHindiNumerals(content)}</>;
     }
     return (
       <>
         {parts.map((part, i) => (
-          <span key={i}>
+          <Fragment key={i}>
             {toHindiNumerals(part)}
             {i < parts.length - 1 && <br />}
-          </span>
+          </Fragment>
         ))}
       </>
     );
@@ -1245,7 +1245,7 @@ export function ArticleReferenceText({
   
   return (
     <>
-      <span className="inline">
+      <span>
         {segments.map((segment, idx) => {
           if (segment.type === 'text') {
             // For the first text segment in a definition context, highlight the term
@@ -1263,17 +1263,17 @@ export function ArticleReferenceText({
             // Handle line breaks in text segments
             const parts = segment.content.split(/\n+/);
             if (parts.length === 1) {
-              return <span key={idx}>{toHindiNumerals(segment.content)}</span>;
+              return <Fragment key={idx}>{toHindiNumerals(segment.content)}</Fragment>;
             }
             return (
-              <span key={idx}>
+              <Fragment key={idx}>
                 {parts.map((part, i) => (
-                  <span key={i}>
+                  <Fragment key={i}>
                     {toHindiNumerals(part)}
                     {i < parts.length - 1 && <br />}
-                  </span>
+                  </Fragment>
                 ))}
-              </span>
+              </Fragment>
             );
           }
           
@@ -1295,17 +1295,16 @@ export function ArticleReferenceText({
                 <a
                   key={idx}
                   href={`/law/${externalLaw.id}${articleParam}`}
-                  className="text-blue-600 dark:text-blue-400 font-semibold underline decoration-blue-400/30 underline-offset-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all inline-flex items-center gap-1"
-                  style={{ display: 'inline' }}
+                  className="text-blue-600 dark:text-blue-400 font-semibold underline decoration-blue-400/30 underline-offset-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                   title={`الانتقال إلى ${externalLaw.title_ar}`}
                 >
                   {toHindiNumerals(segment.content)}
-                  <ExternalLink className="w-3 h-3 inline-block opacity-50" />
+                  <ExternalLink className="w-3 h-3 opacity-50" style={{ display: 'inline', verticalAlign: 'middle', marginInlineStart: '2px' }} />
                 </a>
               );
             }
             // External law not found in library — show as plain text (no wrong link)
-            return <span key={idx}>{toHindiNumerals(segment.content)}</span>;
+            return <Fragment key={idx}>{toHindiNumerals(segment.content)}</Fragment>;
           }
 
           const articleNumber = segment.articleNumber!;
@@ -1314,7 +1313,7 @@ export function ArticleReferenceText({
           const isSelfReference = articleNumber === currentArticleNumber;
 
           if (isSelfReference || !referencedArticle) {
-            return <span key={idx}>{toHindiNumerals(segment.content)}</span>;
+            return <Fragment key={idx}>{toHindiNumerals(segment.content)}</Fragment>;
           }
 
           const clickableRef = (
@@ -1348,7 +1347,7 @@ export function ArticleReferenceText({
             );
           }
 
-          return <span key={idx}>{clickableRef}</span>;
+          return <Fragment key={idx}>{clickableRef}</Fragment>;
         })}
       </span>
 
