@@ -9,7 +9,7 @@ import { HighlightedSnippet } from "@/components/search/HighlightedSnippet";
 import { useDebounce } from "@/hooks/use-debounce";
 import {
   Search, X, BookOpen, Scale, Newspaper, ArrowLeft,
-  Sparkles, MapPin, Calendar, Filter, Zap,
+  Sparkles, MapPin, Calendar, Filter, Zap, Loader2,
   ChevronDown, ChevronUp, Quote, Minus, BarChart3, FileText, ArrowRight,
   Tag, TrendingUp
 } from "lucide-react";
@@ -398,7 +398,12 @@ export default function UnifiedSearch() {
               {/* Main Results */}
               <div className="flex-1 min-w-0 relative">
                 {isFetching && !isLoading && (
-                  <div className="absolute inset-0 bg-background/40 z-10 rounded-xl" />
+                  <div className="absolute inset-0 bg-background/50 z-10 rounded-xl flex items-start justify-center pt-24">
+                    <div className="flex items-center gap-2 bg-card shadow-lg border border-border rounded-full px-4 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      جارٍ البحث...
+                    </div>
+                  </div>
                 )}
 
                 {isLoading ? (
