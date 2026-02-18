@@ -159,7 +159,7 @@ export default function UnifiedSearch() {
 
   // Main search query
   const { data, isLoading, isFetching } = useQuery<SearchResult>({
-    queryKey: ["unified-search", debouncedQuery, activeTab, page, exactSearch, saudiOnly],
+    queryKey: ["unified-search", debouncedQuery, activeTab, page, exactSearch, saudiOnly, showFacets],
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({
         q: debouncedQuery,
@@ -169,6 +169,7 @@ export default function UnifiedSearch() {
       });
       if (exactSearch) params.set("exact", "true");
       if (saudiOnly) params.set("saudi_only", "true");
+      if (showFacets) params.set("facets", "true");
       const res = await fetch(`/api/search?${params}`, { signal });
       if (!res.ok) throw new Error("Search failed");
       return res.json();
@@ -217,13 +218,14 @@ export default function UnifiedSearch() {
     inputRef.current?.focus();
   }, [inputValue]);
 
+  const formatCount = (n: number) => n === -1 ? "+" : n.toLocaleString("en");
   const tabCounts = data ? {
-    all: data.totalResults,
-    laws: data.results.laws.total,
-    judgments: data.results.judgments.total,
-    gazette: data.results.gazette.total,
-    tameems: data.results.tameems?.total || 0,
-  } : { all: 0, laws: 0, judgments: 0, gazette: 0, tameems: 0 };
+    all: formatCount(data.totalResults),
+    laws: formatCount(data.results.laws.total),
+    judgments: formatCount(data.results.judgments.total),
+    gazette: formatCount(data.results.gazette.total),
+    tameems: formatCount(data.results.tameems?.total || 0),
+  } : { all: "0", laws: "0", judgments: "0", gazette: "0", tameems: "0" };
 
   const isSearchActive = debouncedQuery.length >= 2;
 
@@ -322,7 +324,7 @@ export default function UnifiedSearch() {
               <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
                   <Zap className="h-3.5 w-3.5 text-primary" />
-                  {data.totalResults.toLocaleString("en")} نتيجة
+                  {data.totalResults === -1 ? "نتائج متعددة" : `${data.totalResults.toLocaleString("en")} نتيجة`}
                 </span>
                 <span>في {data.timeTaken} مللي ثانية</span>
                 {data.intent?.expandedTerms && data.intent.expandedTerms.length > 0 && (
@@ -373,8 +375,8 @@ export default function UnifiedSearch() {
                     {TABS.find(t => t.key === activeTab)?.shortLabel}
                   </Badge>
                 )}
-                {tabCounts[activeTab] > 0 && (
-                  <span>{tabCounts[activeTab].toLocaleString("en")} نتيجة</span>
+                {tabCounts[activeTab as keyof typeof tabCounts] !== "0" && (
+                  <span>{tabCounts[activeTab as keyof typeof tabCounts] === "+" ? "نتائج متعددة" : `${tabCounts[activeTab as keyof typeof tabCounts]} نتيجة`}</span>
                 )}
               </div>
               {data && (data.facets.years.length > 0 || data.facets.cities.length > 0 || data.facets.categories.length > 0) && (
@@ -643,8 +645,12 @@ function AllResultsView({ data }: { data: SearchResult }) {
   );
 }
 
+function estimatePages(total: number, page: number, limit = 15) {
+  return total === -1 ? page + 1 : Math.ceil(total / limit);
+}
+
 function LawResultsView({ items, total, page, onPageChange, query }: { items: LawResult[]; total: number; page: number; onPageChange: (p: number) => void; query?: string }) {
-  const totalPages = Math.ceil(total / 15);
+  const totalPages = estimatePages(total, page);
   return (
     <div>
       <div className="space-y-3 mb-6">
@@ -656,7 +662,7 @@ function LawResultsView({ items, total, page, onPageChange, query }: { items: La
 }
 
 function JudgmentResultsView({ items, total, page, onPageChange, query }: { items: JudgmentResult[]; total: number; page: number; onPageChange: (p: number) => void; query?: string }) {
-  const totalPages = Math.ceil(total / 15);
+  const totalPages = estimatePages(total, page);
   return (
     <div>
       <div className="space-y-3 mb-6">
@@ -668,7 +674,7 @@ function JudgmentResultsView({ items, total, page, onPageChange, query }: { item
 }
 
 function GazetteResultsView({ items, total, page, onPageChange, query }: { items: GazetteResult[]; total: number; page: number; onPageChange: (p: number) => void; query?: string }) {
-  const totalPages = Math.ceil(total / 15);
+  const totalPages = estimatePages(total, page);
   return (
     <div>
       <div className="space-y-3 mb-6">
@@ -680,7 +686,7 @@ function GazetteResultsView({ items, total, page, onPageChange, query }: { items
 }
 
 function TameemsResultsView({ items, total, page, onPageChange, query }: { items: TameemResult[]; total: number; page: number; onPageChange: (p: number) => void; query?: string }) {
-  const totalPages = Math.ceil(total / 15);
+  const totalPages = estimatePages(total, page);
   return (
     <div>
       <div className="space-y-3 mb-6">

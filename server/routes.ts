@@ -606,11 +606,10 @@ export async function registerRoutes(
       mainQuery = `(${mainQuery}) ${notClauses}`;
     }
 
-    if (expandedTerms.length === 0) return mainQuery || raw.trim().split(/\s+/).map(w => `${w}*`).join(" ");
-
-    // Build OR expansion: (original terms) OR (synonym1*) OR (synonym2*)
-    const expansions = expandedTerms.map(t => `${t}*`);
-    return `(${mainQuery}) OR (${expansions.join(" OR ")})`;
+    // Synonym expansion removed for performance — OR queries blow up result sets
+    // (e.g. "نظام الشركات" OR "شركة*" → 41K results instead of 5K, 5x slower)
+    // Synonyms are still returned in intent.expandedTerms for UI suggestions
+    return mainQuery || raw.trim().split(/\s+/).map(w => `${w}*`).join(" ");
   }
 
   // Prepared statements for search (faster than building each time)
@@ -723,6 +722,7 @@ export async function registerRoutes(
       const type = (req.query.type as string) || "all";
       const exact = req.query.exact as string;
       const saudiOnly = req.query.saudi_only === "true";
+      const withFacets = req.query.facets === "true";
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
       const offset = (page - 1) * limit;
@@ -745,22 +745,25 @@ export async function registerRoutes(
         ? buildLiteralFtsQuery(q)
         : buildFtsQuery(q, intent.expandedTerms);
 
-      // Search all sources - priority order affects "all" tab display
+      // Search all sources — fetch limit+1 rows to detect "has more" without COUNT(*)
+      const searchWithEstimate = (stmt: any, ftsQ: string, lim: number, off: number) => {
+        const items = stmt.all(ftsQ, lim + 1, off) as any[];
+        const hasMore = items.length > lim;
+        if (hasMore) items.pop();
+        return { items, total: hasMore ? -1 : off + items.length };
+      };
+
       const searchLaws = () => {
         if (type !== "all" && type !== "laws") return { items: [], total: 0 };
-        try {
-          const items = searchLawsStmt.all(ftsQuery, limit, offset) as any[];
-          const countResult = countLawsStmt.get(ftsQuery) as any;
-          return { items, total: countResult?.count || 0 };
-        } catch { return { items: [], total: 0 }; }
+        try { return searchWithEstimate(searchLawsStmt, ftsQuery, limit, offset); }
+        catch { return { items: [], total: 0 }; }
       };
 
       const searchJudgments = () => {
         if (type !== "all" && type !== "judgments") return { items: [], total: 0 };
         try {
           if (saudiOnly) {
-            // Filter out non-Saudi (Egyptian) judgments
-            const items = sqlite.prepare(`
+            const saudiStmt = sqlite.prepare(`
               SELECT j.id, j.case_id, j.year_hijri, j.city, j.court_body, j.judgment_date, j.source,
                      snippet(judgments_fts, 0, '【', '】', '...', 40) as textSnippet,
                      bm25(judgments_fts) as rank
@@ -769,48 +772,31 @@ export async function registerRoutes(
               WHERE judgments_fts MATCH ? AND j.source != 'eg_naqd'
               ORDER BY rank
               LIMIT ? OFFSET ?
-            `).all(ftsQuery, limit, offset) as any[];
-            const countResult = sqlite.prepare(`
-              SELECT count(*) as count
-              FROM judgments j
-              INNER JOIN judgments_fts fts ON j.id = fts.rowid
-              WHERE judgments_fts MATCH ? AND j.source != 'eg_naqd'
-            `).get(ftsQuery) as any;
-            return { items, total: countResult?.count || 0 };
+            `);
+            return searchWithEstimate(saudiStmt, ftsQuery, limit, offset);
           }
-          const items = searchJudgmentsStmt.all(ftsQuery, limit, offset) as any[];
-          const countResult = countJudgmentsStmt.get(ftsQuery) as any;
-          return { items, total: countResult?.count || 0 };
+          return searchWithEstimate(searchJudgmentsStmt, ftsQuery, limit, offset);
         } catch { return { items: [], total: 0 }; }
       };
 
       const searchGazette = () => {
         if (type !== "all" && type !== "gazette") return { items: [], total: 0 };
-        try {
-          const items = searchGazetteStmt.all(ftsQuery, limit, offset) as any[];
-          const countResult = countGazetteStmt.get(ftsQuery) as any;
-          return { items, total: countResult?.count || 0 };
-        } catch { return { items: [], total: 0 }; }
+        try { return searchWithEstimate(searchGazetteStmt, ftsQuery, limit, offset); }
+        catch { return { items: [], total: 0 }; }
       };
 
       const searchTameems = () => {
         if (type !== "all" && type !== "tameems") return { items: [], total: 0 };
         if (!searchTameemsStmt) return { items: [], total: 0 };
-        try {
-          const items = searchTameemsStmt.all(ftsQuery, limit, offset) as any[];
-          const countResult = countTameemsStmt.get(ftsQuery) as any;
-          return { items, total: countResult?.count || 0 };
-        } catch { return { items: [], total: 0 }; }
+        try { return searchWithEstimate(searchTameemsStmt, ftsQuery, limit, offset); }
+        catch { return { items: [], total: 0 }; }
       };
 
       const searchPrinciples = () => {
         if (type !== "all" && type !== "principles") return { items: [], total: 0 };
         if (!searchCrsdStmt) return { items: [], total: 0 };
-        try {
-          const items = searchCrsdStmt.all(ftsQuery, limit, offset) as any[];
-          const countResult = countCrsdStmt.get(ftsQuery) as any;
-          return { items, total: countResult?.count || 0 };
-        } catch { return { items: [], total: 0 }; }
+        try { return searchWithEstimate(searchCrsdStmt, ftsQuery, limit, offset); }
+        catch { return { items: [], total: 0 }; }
       };
 
       // Execute all searches (SQLite is sync so they run sequentially, but each is fast with FTS5)
@@ -821,15 +807,18 @@ export async function registerRoutes(
       const principlesResults = searchPrinciples();
 
       const timeTaken = Date.now() - startTime;
-      const totalResults = lawResults.total + judgmentResults.total + gazetteResults.total + tameemsResults.total + principlesResults.total;
+      // total = -1 means "more than current page" (exact count skipped for performance)
+      const allTotals = [lawResults.total, judgmentResults.total, gazetteResults.total, tameemsResults.total, principlesResults.total];
+      const hasUnknown = allTotals.some(t => t === -1);
+      const totalResults = hasUnknown ? -1 : allTotals.reduce((a, b) => a + b, 0);
 
       // Cross-reference: find related content across types
       const crossLinks: { lawsToJudgments: string[]; lawsToGazette: string[]; relatedLaws: string[] } = { lawsToJudgments: [], lawsToGazette: [], relatedLaws: [] };
       if (type === "all" && lawResults.items.length > 0) {
         const lawNames = Array.from(new Set(lawResults.items.map((l: any) => l.law_name).filter(Boolean))).slice(0, 3);
         for (const name of lawNames) {
-          if (judgmentResults.total > 0) crossLinks.lawsToJudgments.push(name as string);
-          if (gazetteResults.total > 0) crossLinks.lawsToGazette.push(name as string);
+          if (judgmentResults.items.length > 0) crossLinks.lawsToJudgments.push(name as string);
+          if (gazetteResults.items.length > 0) crossLinks.lawsToGazette.push(name as string);
         }
         // Extract unique law_ids for cross-law referencing
         const lawIds = Array.from(new Set(lawResults.items.map((l: any) => l.law_id))).slice(0, 5);
@@ -841,41 +830,41 @@ export async function registerRoutes(
         years: [], cities: [], categories: []
       };
 
-      try {
-        if (type === "all" || type === "judgments") {
-          // Get judgment year facets for this query
-          const yearFacets = sqlite.prepare(`
-            SELECT j.year_hijri as year, count(*) as count
-            FROM judgments j
-            INNER JOIN judgments_fts fts ON j.id = fts.rowid
-            WHERE judgments_fts MATCH ? AND j.year_hijri IS NOT NULL
-            GROUP BY j.year_hijri ORDER BY count DESC LIMIT 10
-          `).all(ftsQuery) as any[];
-          facets.years = yearFacets;
+      // Facets are expensive (GROUP BY on FTS) — only compute when explicitly requested
+      if (withFacets) {
+        try {
+          if (type === "all" || type === "judgments") {
+            const yearFacets = sqlite.prepare(`
+              SELECT j.year_hijri as year, count(*) as count
+              FROM judgments j
+              INNER JOIN judgments_fts fts ON j.id = fts.rowid
+              WHERE judgments_fts MATCH ? AND j.year_hijri IS NOT NULL
+              GROUP BY j.year_hijri ORDER BY count DESC LIMIT 10
+            `).all(ftsQuery) as any[];
+            facets.years = yearFacets;
 
-          // Get city facets
-          const cityFacets = sqlite.prepare(`
-            SELECT j.city as city, count(*) as count
-            FROM judgments j
-            INNER JOIN judgments_fts fts ON j.id = fts.rowid
-            WHERE judgments_fts MATCH ? AND j.city IS NOT NULL AND j.city != ''
-            GROUP BY j.city ORDER BY count DESC LIMIT 10
-          `).all(ftsQuery) as any[];
-          facets.cities = cityFacets;
-        }
+            const cityFacets = sqlite.prepare(`
+              SELECT j.city as city, count(*) as count
+              FROM judgments j
+              INNER JOIN judgments_fts fts ON j.id = fts.rowid
+              WHERE judgments_fts MATCH ? AND j.city IS NOT NULL AND j.city != ''
+              GROUP BY j.city ORDER BY count DESC LIMIT 10
+            `).all(ftsQuery) as any[];
+            facets.cities = cityFacets;
+          }
 
-        if (type === "all" || type === "gazette") {
-          // Get gazette category facets
-          const catFacets = sqlite.prepare(`
-            SELECT g.category as category, count(*) as count
-            FROM gazette_index g
-            INNER JOIN gazette_fts fts ON g.id = fts.rowid
-            WHERE gazette_fts MATCH ? AND g.category IS NOT NULL AND g.category != ''
-            GROUP BY g.category ORDER BY count DESC LIMIT 10
-          `).all(ftsQuery) as any[];
-          facets.categories = catFacets;
-        }
-      } catch {}
+          if (type === "all" || type === "gazette") {
+            const catFacets = sqlite.prepare(`
+              SELECT g.category as category, count(*) as count
+              FROM gazette_index g
+              INNER JOIN gazette_fts fts ON g.id = fts.rowid
+              WHERE gazette_fts MATCH ? AND g.category IS NOT NULL AND g.category != ''
+              GROUP BY g.category ORDER BY count DESC LIMIT 10
+            `).all(ftsQuery) as any[];
+            facets.categories = catFacets;
+          }
+        } catch {}
+      }
 
       // Parse advanced query info for frontend display
       const parsedInfo = parseAdvancedQuery(q);
@@ -886,10 +875,10 @@ export async function registerRoutes(
         sqlite.prepare(`
           INSERT INTO search_logs (query, query_normalized, result_count, result_type, time_taken, has_results)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).run(q, normalized, totalResults, type, timeTaken, totalResults > 0 ? 1 : 0);
+        `).run(q, normalized, totalResults === -1 ? 999 : totalResults, type, timeTaken, totalResults !== 0 ? 1 : 0);
       } catch {}
 
-      res.set("Cache-Control", "public, max-age=60");
+      res.set("Cache-Control", "public, max-age=300");
       res.json({
         query: q,
         totalResults,
