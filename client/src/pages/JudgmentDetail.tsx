@@ -27,6 +27,7 @@ import {
     BookOpen,
     UserRound,
     Gavel,
+    FileText,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "react";
 import {
@@ -57,6 +58,7 @@ interface Judgment {
     principleText?: string | null;
     source?: string;
     appealType?: string;
+    pdfUrl?: string | null;
 }
 
 const TOKEN_STYLES: Record<string, string> = {};
@@ -519,6 +521,7 @@ export default function JudgmentDetail() {
 
     const isEgyptian = judgment?.source === "eg_naqd";
     const isBog = judgment?.source === "bog_judicial";
+    const isMojResearch = judgment?.source === "moj_research";
 
     const displayCourtName = useMemo(() => {
         if (!judgment) return "";
@@ -674,6 +677,18 @@ export default function JudgmentDetail() {
                             </TooltipTrigger>
                             <TooltipContent>طباعة</TooltipContent>
                         </Tooltip>
+                        {judgment?.pdfUrl && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <a href={judgment.pdfUrl} target="_blank" rel="noopener noreferrer">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700">
+                                            <FileText className="h-4 w-4" />
+                                        </Button>
+                                    </a>
+                                </TooltipTrigger>
+                                <TooltipContent>عرض الحكم الأصلي (PDF)</TooltipContent>
+                            </Tooltip>
+                        )}
                     </div>
                 </div>
             </div>

@@ -128,9 +128,9 @@ export async function registerRoutes(
         (SELECT COUNT(*) FROM users) as usersTotal,
         (SELECT COUNT(*) FROM app_users WHERE role = 'admin') as adminsTotal,
         (SELECT COUNT(*) FROM app_users WHERE subscription_status = 'active') as activeSubscriptions,
-        (SELECT COUNT(*) FROM analytics_sessions) as visitsTotal,
-        (SELECT COUNT(DISTINCT visitor_id) FROM analytics_sessions WHERE datetime(started_at) >= datetime('now', '-6 days')) as uniqueVisitors7d,
-        (SELECT COALESCE(AVG(duration_seconds), 0) FROM analytics_sessions WHERE duration_seconds > 0) as avgSessionDurationSec
+        (SELECT COUNT(*) FROM analytics_sessions WHERE is_bot = 0) as visitsTotal,
+        (SELECT COUNT(DISTINCT visitor_id) FROM analytics_sessions WHERE is_bot = 0 AND datetime(started_at) >= datetime('now', '-6 days')) as uniqueVisitors7d,
+        (SELECT COALESCE(AVG(duration_seconds), 0) FROM analytics_sessions WHERE is_bot = 0 AND duration_seconds > 0 AND duration_seconds <= 7200) as avgSessionDurationSec
     `).get() as any;
 
     const tiers = sqlite.prepare(`
@@ -153,7 +153,7 @@ export async function registerRoutes(
     const topEntryPages = sqlite.prepare(`
       SELECT entry_page as label, COUNT(*) as count
       FROM analytics_sessions
-      WHERE entry_page IS NOT NULL AND entry_page != ''
+      WHERE is_bot = 0 AND entry_page IS NOT NULL AND entry_page != ''
       GROUP BY entry_page
       ORDER BY count DESC
       LIMIT 6
@@ -162,7 +162,7 @@ export async function registerRoutes(
     const topSources = sqlite.prepare(`
       SELECT entry_source as label, COUNT(*) as count
       FROM analytics_sessions
-      WHERE entry_source IS NOT NULL AND entry_source != ''
+      WHERE is_bot = 0 AND entry_source IS NOT NULL AND entry_source != ''
       GROUP BY entry_source
       ORDER BY count DESC
       LIMIT 6
@@ -171,7 +171,7 @@ export async function registerRoutes(
     const countries = sqlite.prepare(`
       SELECT country_code as label, COUNT(*) as count
       FROM analytics_sessions
-      WHERE country_code IS NOT NULL AND country_code != ''
+      WHERE is_bot = 0 AND country_code IS NOT NULL AND country_code != ''
       GROUP BY country_code
       ORDER BY count DESC
       LIMIT 8
@@ -180,7 +180,7 @@ export async function registerRoutes(
     const ages = sqlite.prepare(`
       SELECT age_range as label, COUNT(*) as count
       FROM analytics_sessions
-      WHERE age_range IS NOT NULL AND age_range != ''
+      WHERE is_bot = 0 AND age_range IS NOT NULL AND age_range != ''
       GROUP BY age_range
       ORDER BY count DESC
       LIMIT 8
@@ -1283,7 +1283,7 @@ export async function registerRoutes(
           if (city) { filters.push("j.city LIKE ?"); params.push(city); }
           if (year) { filters.push("j.year_hijri = ?"); params.push(parseInt(year as string)); }
           if (court) { filters.push("j.court_body LIKE ?"); params.push(`%${court}%`); }
-          if (source === "sa_all") { filters.push("j.source IN ('sa_judicial', 'bog_judicial')"); }
+          if (source === "sa_all") { filters.push("j.source IN ('sa_judicial', 'bog_judicial', 'moj_research')"); }
           else if (source) { filters.push("j.source = ?"); params.push(source); }
           if (hasDate === "true") { filters.push("j.judgment_date IS NOT NULL AND j.judgment_date != ''"); }
           if (judge) { filters.push("j.judges LIKE ?"); params.push(`%${judge}%`); }
@@ -1360,7 +1360,7 @@ export async function registerRoutes(
         conditions.push(sql`judgment_date IS NOT NULL AND judgment_date != ''`);
       }
       if (source === "sa_all") {
-        conditions.push(sql`source IN ('sa_judicial', 'bog_judicial')`);
+        conditions.push(sql`source IN ('sa_judicial', 'bog_judicial', 'moj_research')`);
       } else if (source) {
         conditions.push(eq(judgments.source, source as string));
       }
@@ -1444,7 +1444,7 @@ export async function registerRoutes(
 
   // Pre-warm facets cache in background after server starts
   function warmFacetsCache(sourceKey: string) {
-    const srcFilter = sourceKey === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial')" : sourceKey ? " AND source = ?" : "";
+    const srcFilter = sourceKey === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial', 'moj_research')" : sourceKey ? " AND source = ?" : "";
     const srcParam = sourceKey === "sa_all" ? [] : sourceKey ? [sourceKey] : [];
     try {
       const cities = sqlite.prepare(
@@ -1480,7 +1480,7 @@ export async function registerRoutes(
       }
 
       // If not cached yet, compute now
-      const srcFilter = source === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial')" : source ? " AND source = ?" : "";
+      const srcFilter = source === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial', 'moj_research')" : source ? " AND source = ?" : "";
       const srcParam = source === "sa_all" ? [] : source ? [source] : [];
 
       const cities = sqlite.prepare(

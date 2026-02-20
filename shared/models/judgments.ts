@@ -17,6 +17,7 @@ export const judgments = sqliteTable(
         source: text("source").notNull().default("sa_judicial"),
         appealType: text("appeal_type"),
         judges: text("judges", { mode: "json" }).$type<{ role: string; name: string }[]>(),
+        pdfUrl: text("pdf_url"),
         createdAt: text("created_at").notNull().default("(datetime('now'))"),
     },
     (table) => ({

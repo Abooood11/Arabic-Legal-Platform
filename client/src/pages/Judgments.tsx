@@ -153,6 +153,14 @@ function SourceBadge({ source }: { source?: string }) {
             </Badge>
         );
     }
+    if (source === "moj_research") {
+        return (
+            <Badge variant="outline" className="border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-[11px] gap-1">
+                <Landmark className="h-3 w-3" />
+                مركز البحوث
+            </Badge>
+        );
+    }
     return null;
 }
 
