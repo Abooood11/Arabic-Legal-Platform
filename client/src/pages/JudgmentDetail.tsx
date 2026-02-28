@@ -28,6 +28,7 @@ import {
     UserRound,
     Gavel,
     FileText,
+    AlertTriangle,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "react";
 import {
@@ -948,6 +949,26 @@ export default function JudgmentDetail() {
                 )}
 
                 {/* Egyptian Principle Text - hidden (مشتتة للقارئ) */}
+
+                {/* CRSD Text Quality Notice */}
+                {crsdMeta?.textQuality && (
+                    <div className={`flex items-center gap-3 rounded-xl px-4 py-3 mb-4 text-sm ${
+                        crsdMeta.textQuality === "empty_body"
+                            ? "bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-700"
+                            : crsdMeta.textQuality === "corrupted"
+                            ? "bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800"
+                            : "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
+                    }`}>
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span>
+                            {crsdMeta.textQuality === "empty_body"
+                                ? "نص القرار غير متوفر — البيانات الوصفية فقط"
+                                : crsdMeta.textQuality === "corrupted"
+                                ? "نص القرار تالف بسبب أخطاء في الاستخراج الآلي"
+                                : "نص القرار قد يكون غير مكتمل — انتهى بشكل مفاجئ"}
+                        </span>
+                    </div>
+                )}
 
                 {/* Judgment Text */}
                 <div className="rounded-2xl bg-background border shadow-sm p-6 sm:p-8">
