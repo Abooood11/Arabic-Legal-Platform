@@ -531,16 +531,36 @@ function parseCrsdJudgment(text: string): JudgmentSection[] {
     // Also try end-of-text ruling patterns if no explicit منطوق header
     let endRulingIdx = -1;
     if (!mantooqMatch) {
-        const endPatterns = [
-            /\n\s*فقد قررت اللجنة/,
-            /\n\s*لذا قررت اللجنة/,
-            /\n\s*قررت اللجنة (?:ما يلي|الآتي|بالآتي)/,
-            /\n\s*فلهذه الأسباب[\s\S]{0,30}قررت/,
+        // Search only in the last portion of text (after الأسباب or last 40%)
+        // to avoid false positives from early occurrences
+        const searchStart = asbabMatch ? (asbabMatch.index ?? 0) : Math.floor(text.length * 0.6);
+        const tail = text.substring(searchStart);
+        const tailOffset = searchStart;
+
+        const endPatterns: [RegExp, boolean][] = [
+            // [pattern, startsWithNewline] — startsWithNewline adjusts index by +1
+            // Explicit ruling starters on own line
+            [/\n\s*فقد قررت اللجنة/, true],
+            [/\n\s*لذا قررت اللجنة/, true],
+            [/\n\s*قررت اللجنة (?:ما يلي|الآتي|بالآتي)/, true],
+            [/\n\s*فلهذه الأسباب[\s\S]{0,30}قررت/, true],
+            // "قررت لجنة الاستئناف/الفصل" (with optional فلهذه الأسباب after)
+            [/\n\s*قررت\s*لجنة\s*(?:الاستئناف|الفصل)/, true],
+            // "ولما تقدم...قررت اللجنة/الدائرة الآتي" (most common ~971 cases)
+            [/(?:ولما|لما)\s*تقدم[\s\S]{0,100}قَ?رَ?رَ?ت\s*(?:اللجنة|الدائرة)[\s\S]{0,40}(?:الآتي|ما\s*يلي|بالآتي)/, false],
+            // "وبعد المداولة نظاماً، قررت" (~205 cases)
+            [/وبعد\s*المداولة\s*(?:نظام(?:اً|ا))?\s*(?:،|,)?\s*قَ?رَ?رَ?ت/, false],
+            // "، قررت اللجنة/الدائرة" mid-sentence (~62 cases)
+            [/(?:،|,)\s*قَ?رَ?رَ?ت\s*(?:اللجنة|الدائرة)/, false],
+            // "قررت الدائرة" on its own line
+            [/\n\s*قررت\s*الدائرة/, true],
+            // standalone "فلهذه الأسباب" followed by ruling items or at end of text
+            [/\n\s*فلهذه\s*الأسباب\s*(?:\n|$)/, true],
         ];
-        for (const pat of endPatterns) {
-            const m = text.match(pat);
+        for (const [pat, nlStart] of endPatterns) {
+            const m = tail.match(pat);
             if (m && m.index !== undefined) {
-                endRulingIdx = m.index + 1; // skip the leading \n
+                endRulingIdx = tailOffset + m.index + (nlStart ? 1 : 0);
                 break;
             }
         }
@@ -595,6 +615,14 @@ function extractCrsdRuling(text: string): string | null {
     const endPatterns = [
         /(?:فقد قررت اللجنة|لذا قررت اللجنة|قررت اللجنة (?:ما يلي|الآتي|بالآتي))([\s\S]+)$/,
         /فلهذه الأسباب[\s\S]{0,50}(قررت[\s\S]+)$/,
+        // "قررت لجنة الاستئناف/الفصل فلهذه الأسباب"
+        /(قررت\s*لجنة\s*(?:الاستئناف|الفصل)[\s\S]+)$/,
+        // "ولما تقدم...قررت اللجنة/الدائرة الآتي:"
+        /((?:ولما|لما)\s*تقدم[\s\S]{0,80}قَ?رَ?رَ?ت\s*(?:اللجنة|الدائرة)[\s\S]+)$/,
+        // "وبعد المداولة نظاماً، قررت"
+        /(وبعد\s*المداولة[\s\S]{0,30}قَ?رَ?رَ?ت[\s\S]+)$/,
+        // "، قررت اللجنة/الدائرة" mid-sentence
+        /((?:،|,)\s*قَ?رَ?رَ?ت\s*(?:اللجنة|الدائرة)[\s\S]+)$/,
     ];
     for (const pat of endPatterns) {
         const m = text.match(pat);
