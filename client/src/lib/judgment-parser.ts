@@ -188,6 +188,9 @@ export function parseJudgmentText(text: string, source?: string): JudgmentSectio
     if (source === "eg_naqd") {
         return parseEgyptianJudgment(text);
     }
+    if (source === "crsd") {
+        return parseCrsdJudgment(text);
+    }
 
     // Unknown source - show as single formatted block
     return [{
@@ -288,6 +291,9 @@ export function extractRuling(text: string, source?: string): string | null {
     if (source === "eg_naqd") {
         return extractEgyptianRuling(text);
     }
+    if (source === "crsd") {
+        return extractCrsdRuling(text);
+    }
     return null;
 }
 
@@ -329,6 +335,291 @@ function extractEgyptianRuling(text: string): string | null {
         }
     }
     return null;
+}
+
+/**
+ * CRSD (لجان منازعات الأوراق المالية) metadata - structured per committee.
+ * Organized as a Saudi securities law expert would expect:
+ * بيانات لجنة الفصل + بيانات لجنة الاستئناف (if appeals).
+ */
+export interface CrsdMetadata {
+    /** نتيجة القرار: تأييد / تعديل / إلغاء / نقض / قرار نهائي */
+    resultType?: string;
+    /** Short result label for badge: تأييد / تعديل / إلغاء / نقض / نهائي */
+    resultLabel?: string;
+    /** رقم القضية لدى لجنة الفصل */
+    caseNumber?: string;
+    /** بيانات قرار لجنة الفصل */
+    fasal: { decisionNumber?: string; decisionDate?: string };
+    /** بيانات قرار لجنة الاستئناف (null for final decisions) */
+    appeal: { decisionNumber?: string; decisionDate?: string };
+    /** نوع الدعوى (مدنية/جزائية/إدارية) */
+    caseType?: string;
+    /** التصنيف الموضوعي */
+    subjectClass?: string;
+    /** سبب النهائية - for قرارات نهائية only */
+    finalityReason?: string;
+    /** Whether this is a final (non-appealed) decision */
+    isFinal: boolean;
+    /** The body text starting from الوقائع */
+    bodyText: string;
+}
+
+/**
+ * Parse CRSD decision header into structured metadata.
+ * Handles both colon-formatted and table-like (OCR-flattened) headers.
+ */
+export function parseCrsdMetadata(text: string): CrsdMetadata | null {
+    if (!text) return null;
+
+    // Find الوقائع to delimit header
+    const waqaeiMatch = text.match(/\n\s*الوقائع\s*\n/);
+    if (!waqaeiMatch || waqaeiMatch.index === undefined) {
+        const fallback = text.match(/^الوقائع\s*$/m);
+        if (!fallback || fallback.index === undefined || fallback.index > 1500) return null;
+        return parseCrsdHeader(text.substring(0, fallback.index), text.substring(fallback.index));
+    }
+    return parseCrsdHeader(text.substring(0, waqaeiMatch.index), text.substring(waqaeiMatch.index));
+}
+
+function parseCrsdHeader(headerText: string, bodyText: string): CrsdMetadata {
+    let resultType: string | undefined;
+    let resultLabel: string | undefined;
+    let caseNumber: string | undefined;
+    let caseType: string | undefined;
+    let subjectClass: string | undefined;
+    let finalityReason: string | undefined;
+    const fasal: { decisionNumber?: string; decisionDate?: string } = {};
+    const appeal: { decisionNumber?: string; decisionDate?: string } = {};
+
+    const lines = headerText.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // 1. Detect result type
+    for (const line of lines) {
+        if (/تأييد لجنة الاستئناف/.test(line)) { resultType = line; resultLabel = "تأييد"; break; }
+        if (/تعديل لجنة الاستئناف/.test(line)) { resultType = line; resultLabel = "تعديل"; break; }
+        if (/إلغاء لجنة الاستئناف/.test(line)) { resultType = line; resultLabel = "إلغاء"; break; }
+        if (/نقض لجنة الاستئناف/.test(line)) { resultType = line; resultLabel = "نقض"; break; }
+        if (/قرار لجنة الفصل النهائي/.test(line)) { resultType = line; resultLabel = "نهائي"; break; }
+        if (/^قرار لجنة الفصل/.test(line)) { resultType = line; resultLabel = "قرار"; break; }
+    }
+    const isFinal = !resultLabel || resultLabel === "نهائي" || resultLabel === "قرار";
+
+    // 2. Extract fields using line-by-line parsing (handles both colon and next-line formats)
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (/^[A-Za-z]/.test(line)) continue;
+
+        // رقم القضية لدى لجنة الفصل
+        const caseNumMatch = line.match(/رقم القضية لدى لجنة الفصل[:\s]*(.*)/);
+        if (caseNumMatch) {
+            let val = caseNumMatch[1].trim();
+            if (!val || /رقم قرار|تاريخ|نوع/.test(val)) { val = peekNextValue(lines, i); if (val) i++; }
+            if (val) caseNumber = val;
+            continue;
+        }
+
+        // رقم قرار لجنة الفصل
+        const fasalNumMatch = line.match(/رقم قرار لجنة الفصل[:\s]*(.*)/);
+        if (fasalNumMatch) {
+            let val = fasalNumMatch[1].trim();
+            if (!val || /رقم قرار|تاريخ|نوع/.test(val)) { val = peekNextValue(lines, i); if (val) i++; }
+            if (val) fasal.decisionNumber = val;
+            continue;
+        }
+
+        // رقم قرار لجنة الاستئناف
+        const appealNumMatch = line.match(/رقم قرار لجنة الاستئناف[:\s]*(.*)/);
+        if (appealNumMatch) {
+            let val = appealNumMatch[1].trim();
+            if (!val || /رقم قرار|تاريخ|نوع/.test(val)) { val = peekNextValue(lines, i); if (val) i++; }
+            if (val) appeal.decisionNumber = val;
+            continue;
+        }
+
+        // تاريخ صدور القرار
+        if (/تاريخ صدور القرار/.test(line)) {
+            let val = line.replace(/تاريخ صدور القرار[:\s]*/, '').trim();
+            // Collect date continuation lines
+            while ((!val || /^\d/.test(val)) && i + 1 < lines.length) {
+                const next = lines[i + 1];
+                if (/^\d|^[١-٩]/.test(next) || /هـ|م$/.test(next)) {
+                    i++;
+                    val += (val ? ' ' : '') + next;
+                } else break;
+            }
+            // Attribute to correct committee based on surrounding context
+            const ctx = lines.slice(Math.max(0, i - 6), i + 1).join(' ');
+            if (/لجنة الاستئناف/.test(ctx) && !appeal.decisionDate) {
+                if (val) appeal.decisionDate = val;
+            } else if (!fasal.decisionDate) {
+                if (val) fasal.decisionDate = val;
+            } else if (!appeal.decisionDate) {
+                if (val) appeal.decisionDate = val;
+            }
+            continue;
+        }
+
+        // نوع الدعوى
+        const caseTypeMatch = line.match(/نوع الدعوى[:\s]*(.*)/);
+        if (caseTypeMatch) {
+            let val = caseTypeMatch[1].trim();
+            if (!val && i + 1 < lines.length) { val = lines[i + 1]; i++; }
+            if (val) caseType = val.replace(/ة$/, 'ي').replace(/ية$/, 'ي'); // normalize
+            // Actually keep original: مدنية / جزائية / إدارية
+            caseType = caseTypeMatch[1].trim() || (i < lines.length ? lines[i] : '');
+            continue;
+        }
+
+        // التصنيف الموضوعي / التصنيف
+        const classMatch = line.match(/(?:التصنيف الموضوعي|التصنيف)[:\s]*(.*)/);
+        if (classMatch) {
+            let val = classMatch[1].trim();
+            if (!val && i + 1 < lines.length) { val = lines[i + 1]; i++; }
+            // Might span multiple lines (e.g. "مخالفة أنظمة السوق المالية\nولوائحه")
+            if (val && i + 1 < lines.length && /^و/.test(lines[i + 1]) && lines[i + 1].length < 30) {
+                i++;
+                val += ' ' + lines[i];
+            }
+            if (val && val.length > 1) subjectClass = val;
+            continue;
+        }
+
+        // سبب النهائية
+        const finalityMatch = line.match(/سبب النهائية[:\s]*(.*)/);
+        if (finalityMatch) {
+            let val = finalityMatch[1].trim();
+            if (!val && i + 1 < lines.length) { val = lines[i + 1]; i++; }
+            if (val) finalityReason = val;
+            continue;
+        }
+    }
+
+    return { resultType, resultLabel, caseNumber, fasal, appeal, caseType, subjectClass, finalityReason, isFinal, bodyText };
+}
+
+/** Peek at next line for a value (skipping label-like lines) */
+function peekNextValue(lines: string[], i: number): string {
+    if (i + 1 >= lines.length) return '';
+    const next = lines[i + 1];
+    if (/رقم القضية|رقم قرار|تاريخ صدور|نوع الدعوى|التصنيف|سبب النهائية/.test(next)) return '';
+    return next.trim();
+}
+
+/**
+ * Parse CRSD judgment body text into sections (الوقائع, الأسباب, المنطوق).
+ */
+function parseCrsdJudgment(text: string): JudgmentSection[] {
+    const sections: JudgmentSection[] = [];
+
+    // Find section boundaries
+    const waqaeiMatch = text.match(/^الوقائع\s*$/m);
+    const asbabMatch = text.match(/^الأسباب\s*$/m);
+
+    // Multiple منطوق patterns for CRSD
+    const mantooqPatterns = [
+        /^منطوق قرار لجنة (?:الفصل|الاستئناف)/m,
+        /^منطوق القرار/m,
+        /^المنطوق\s*$/m,
+    ];
+    let mantooqMatch: RegExpMatchArray | null = null;
+    for (const pat of mantooqPatterns) {
+        mantooqMatch = text.match(pat);
+        if (mantooqMatch) break;
+    }
+
+    // Also try end-of-text ruling patterns if no explicit منطوق header
+    let endRulingIdx = -1;
+    if (!mantooqMatch) {
+        const endPatterns = [
+            /\n\s*فقد قررت اللجنة/,
+            /\n\s*لذا قررت اللجنة/,
+            /\n\s*قررت اللجنة (?:ما يلي|الآتي|بالآتي)/,
+            /\n\s*فلهذه الأسباب[\s\S]{0,30}قررت/,
+        ];
+        for (const pat of endPatterns) {
+            const m = text.match(pat);
+            if (m && m.index !== undefined) {
+                endRulingIdx = m.index + 1; // skip the leading \n
+                break;
+            }
+        }
+    }
+
+    const waqaeiIdx = waqaeiMatch?.index ?? -1;
+    const asbabIdx = asbabMatch?.index ?? -1;
+    const mantooqIdx = mantooqMatch?.index ?? endRulingIdx;
+
+    // Build sections in order
+    const markers: { idx: number; title: string; id: string; color: string }[] = [];
+    if (waqaeiIdx >= 0) markers.push({ idx: waqaeiIdx, title: "الوقائع", id: "facts", color: "amber" });
+    if (asbabIdx > waqaeiIdx) markers.push({ idx: asbabIdx, title: "الأسباب", id: "reasons", color: "purple" });
+    if (mantooqIdx > 0 && mantooqIdx > asbabIdx) markers.push({ idx: mantooqIdx, title: "المنطوق", id: "ruling", color: "rose" });
+
+    if (markers.length === 0) {
+        return [{ id: "full-text", title: "نص القرار", content: text, startIndex: 0, endIndex: text.length, color: "slate" }];
+    }
+
+    for (let i = 0; i < markers.length; i++) {
+        const marker = markers[i];
+        const nextMarker = markers[i + 1];
+        const startIndex = marker.idx;
+        const endIndex = nextMarker ? nextMarker.idx : text.length;
+        const content = text.substring(startIndex, endIndex).trim();
+        if (content.length > 0) {
+            sections.push({ id: marker.id, title: marker.title, content, startIndex, endIndex, color: marker.color });
+        }
+    }
+
+    return sections;
+}
+
+/**
+ * Extract ruling (منطوق) from CRSD decision text.
+ */
+function extractCrsdRuling(text: string): string | null {
+    // Explicit منطوق header
+    const headerPatterns = [
+        /منطوق قرار لجنة (?:الفصل|الاستئناف)\s*\n([\s\S]+)/,
+        /منطوق القرار\s*\n([\s\S]+)/,
+        /^المنطوق\s*\n([\s\S]+)/m,
+    ];
+    for (const pat of headerPatterns) {
+        const m = text.match(pat);
+        if (m && m[1].trim().length > 10 && m[1].trim().length < 3000) {
+            return m[1].trim();
+        }
+    }
+
+    // End-of-text ruling patterns
+    const endPatterns = [
+        /(?:فقد قررت اللجنة|لذا قررت اللجنة|قررت اللجنة (?:ما يلي|الآتي|بالآتي))([\s\S]+)$/,
+        /فلهذه الأسباب[\s\S]{0,50}(قررت[\s\S]+)$/,
+    ];
+    for (const pat of endPatterns) {
+        const m = text.match(pat);
+        if (m && m[0].length > 20 && m[0].length < 3000) {
+            return m[0].trim();
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Strip CRSD header from text (everything before الوقائع).
+ */
+export function stripCrsdHeader(text: string): string {
+    if (!text) return text;
+    const waqaeiMatch = text.match(/\n\s*الوقائع\s*\n/);
+    if (waqaeiMatch && waqaeiMatch.index !== undefined) {
+        return text.substring(waqaeiMatch.index).trim();
+    }
+    const fallback = text.match(/^الوقائع\s*$/m);
+    if (fallback && fallback.index !== undefined && fallback.index < 1500) {
+        return text.substring(fallback.index).trim();
+    }
+    return text;
 }
 
 /**

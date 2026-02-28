@@ -37,12 +37,15 @@ import {
     extractJudges,
     parseBogMetadata,
     parseSaudiCaseInfo,
+    parseCrsdMetadata,
     stripSaudiHeader,
+    stripCrsdHeader,
     fixArabicDate,
     stripPdfBookArtifacts,
     type HighlightedToken,
     type JudgeInfo,
     type BogMetadata,
+    type CrsdMetadata,
 } from "@/lib/judgment-parser";
 
 interface Judgment {
@@ -85,8 +88,19 @@ const SECTION_DIVIDERS: { patterns: RegExp[]; label: string; color: string; bg: 
     },
     {
         // Format B: (منطوق الحكم)  |  Format A: نص الحكم:  |  BOG: لذلك حكمت | فلهذه الأسباب حكمت
-        // keepMatchInText: the matched phrase (لذلك حكمت) stays in the text after the divider
-        patterns: [/\(منطوق الحكم\)/, /نص الحكم\s*:/, /(?:لذلك|فلهذه الأسباب)\s+حكمت/],
+        // CRSD: منطوق قرار لجنة الفصل/الاستئناف  |  فقد قررت اللجنة | لذا قررت اللجنة
+        // keepMatchInText: the matched phrase (لذلك حكمت / فقد قررت) stays in the text after the divider
+        patterns: [
+            /\(منطوق الحكم\)/,
+            /نص الحكم\s*:/,
+            /(?:لذلك|فلهذه الأسباب)\s+حكمت/,
+            /منطوق قرار لجنة (?:الفصل|الاستئناف)/,
+            /منطوق القرار/,
+            /^\s*المنطوق\s*$/m,
+            /فقد قررت اللجنة/,
+            /لذا قررت اللجنة/,
+            /قررت اللجنة (?:ما يلي|الآتي|بالآتي)/,
+        ],
         label: "منطوق الحكم",
         color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-300",
         keepMatchInText: true,
@@ -266,21 +280,22 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
         // after split(/\n\n+/), since the raw OCR text often uses single \n.
         cleanText = cleanText
             .replace(/^\s*الوقائع\s*$/gm, '\n\n\x01SEC\x01\n\n')
-            .replace(/^\s*الأسباب\s*$/gm, '\n\n\x02SEC\x02\n\n');
+            .replace(/^\s*الأسباب\s*$/gm, '\n\n\x02SEC\x02\n\n')
+            .replace(/^\s*(منطوق قرار لجنة (?:الفصل|الاستئناف))\s*$/gm, '\n\n\x03SEC\x03$1\x03SEC\x03\n\n');
 
         // Reflow: OCR produces hard line breaks at PDF page width boundaries.
         // Split on paragraph breaks (\n\n), join single \n within each paragraph.
         // Then collapse mid-sentence \n\n (no terminal punctuation before break).
-        const sectionKeywords = /^(?:لذلك|فلهذه|ومن حيث|وحيث|ولما كان|\x01|\x02)/;
+        const sectionKeywords = /^(?:لذلك|فلهذه|ومن حيث|وحيث|ولما كان|\x01|\x02|\x03)/;
         cleanText = cleanText.split(/\n\n+/).map(para => {
             const t = para.trim();
-            if (!t || t === '\x01SEC\x01' || t === '\x02SEC\x02') return t;
+            if (!t || t === '\x01SEC\x01' || t === '\x02SEC\x02' || t.includes('\x03SEC\x03')) return t;
             return t.replace(/\n/g, ' ');
         }).filter(p => p !== '').reduce((acc, para) => {
             if (!acc) return para;
             // Always keep section markers separate
-            if (para === '\x01SEC\x01' || para === '\x02SEC\x02') return acc + '\n\n' + para;
-            if (acc.endsWith('\x01SEC\x01') || acc.endsWith('\x02SEC\x02')) return acc + '\n\n' + para;
+            if (para === '\x01SEC\x01' || para === '\x02SEC\x02' || para.includes('\x03SEC\x03')) return acc + '\n\n' + para;
+            if (acc.endsWith('\x01SEC\x01') || acc.endsWith('\x02SEC\x02') || acc.includes('\x03SEC\x03')) return acc + '\n\n' + para;
             // Check if previous paragraph ends with punctuation
             const endsWithPunct = /[.،؛:\u06D4]$/.test(acc.trim());
             const startsWithKeyword = sectionKeywords.test(para.trim());
@@ -291,7 +306,8 @@ function JudgmentTextBody({ text, searchTerm }: { text: string; searchTerm: stri
         // Restore section headers
         cleanText = cleanText
             .replace(/\x01SEC\x01/g, 'الوقائع')
-            .replace(/\x02SEC\x02/g, 'الأسباب');
+            .replace(/\x02SEC\x02/g, 'الأسباب')
+            .replace(/\x03SEC\x03/g, '');
 
         // Find section header positions using multi-pattern matching
         const headers: { index: number; length: number; config: typeof SECTION_DIVIDERS[0] }[] = [];
@@ -522,6 +538,9 @@ export default function JudgmentDetail() {
     const isEgyptian = judgment?.source === "eg_naqd";
     const isBog = judgment?.source === "bog_judicial";
     const isMojResearch = judgment?.source === "moj_research";
+    const isCrsd = judgment?.source === "crsd";
+
+    const isCrsdAppeals = isCrsd && judgment?.courtBody?.includes("الاستئناف");
 
     const displayCourtName = useMemo(() => {
         if (!judgment) return "";
@@ -529,8 +548,11 @@ export default function JudgmentDetail() {
             const extracted = extractCourtName(judgment.text, judgment.source);
             return extracted || judgment.courtBody || "حكم قضائي";
         }
+        if (isCrsd) {
+            return judgment.courtBody || "لجنة الفصل في منازعات الأوراق المالية";
+        }
         return judgment.courtBody || "حكم قضائي";
-    }, [judgment, isEgyptian]);
+    }, [judgment, isEgyptian, isCrsd]);
 
     const searchCount = useMemo(() => {
         if (!searchTerm || searchTerm.length < 2 || !judgment?.text) return 0;
@@ -581,6 +603,11 @@ export default function JudgmentDetail() {
         return parseSaudiCaseInfo(judgment.text, judgment.source);
     }, [judgment?.text, judgment?.source]);
 
+    const crsdMeta = useMemo(() => {
+        if (!judgment?.text || judgment?.source !== "crsd") return null;
+        return parseCrsdMetadata(judgment.text);
+    }, [judgment?.text, judgment?.source]);
+
     if (isLoading) {
         return (
             <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -611,13 +638,13 @@ export default function JudgmentDetail() {
     if (judgment.city) chips.push({ icon: MapPin, label: "المدينة", value: judgment.city });
     if (!isEgyptian && judgment.yearHijri) chips.push({ icon: Calendar, label: "السنة", value: `${judgment.yearHijri}هـ` });
     if (judgment.circuitType && judgment.circuitType !== "غير محدد") {
-        chips.push({ icon: Building2, label: isEgyptian ? "نوع الطعن" : "الدائرة", value: judgment.circuitType });
+        chips.push({ icon: Building2, label: isEgyptian ? "نوع الطعن" : isCrsd ? "نوع القضية" : "الدائرة", value: judgment.circuitType });
     }
     if (judgment.judgmentNumber) {
-        chips.push({ icon: Landmark, label: isEgyptian ? "رقم الطعن" : "رقم الحكم", value: judgment.judgmentNumber });
+        chips.push({ icon: Landmark, label: isEgyptian ? "رقم الطعن" : isCrsd ? "رقم القرار" : "رقم الحكم", value: judgment.judgmentNumber });
     }
     if (judgment.judgmentDate) {
-        chips.push({ icon: Calendar, label: isEgyptian ? "تاريخ الجلسة" : "تاريخ الحكم", value: fixArabicDate(judgment.judgmentDate) });
+        chips.push({ icon: Calendar, label: isEgyptian ? "تاريخ الجلسة" : isCrsd ? "تاريخ القرار" : "تاريخ الحكم", value: fixArabicDate(judgment.judgmentDate) });
     }
 
     return (
@@ -686,7 +713,7 @@ export default function JudgmentDetail() {
                                         </Button>
                                     </a>
                                 </TooltipTrigger>
-                                <TooltipContent>عرض الحكم الأصلي (PDF)</TooltipContent>
+                                <TooltipContent>{isCrsd ? "عرض القرار الأصلي (PDF)" : "عرض الحكم الأصلي (PDF)"}</TooltipContent>
                             </Tooltip>
                         )}
                     </div>
@@ -696,7 +723,7 @@ export default function JudgmentDetail() {
             <div className="container mx-auto px-4 py-6 max-w-4xl">
                 {/* Header */}
                 <div className={`mb-5 p-5 rounded-2xl bg-background border shadow-sm border-r-4 ${
-                    isEgyptian ? "border-r-amber-500" : isBog ? "border-r-emerald-600" : "border-r-primary"
+                    isEgyptian ? "border-r-amber-500" : isCrsdAppeals ? "border-r-indigo-500" : isCrsd ? "border-r-teal-500" : isBog ? "border-r-emerald-600" : "border-r-primary"
                 }`}>
                     <div className="flex items-start justify-between gap-3 mb-3">
                         <h1 className="text-lg font-bold text-foreground leading-snug">
@@ -705,6 +732,14 @@ export default function JudgmentDetail() {
                         {isEgyptian ? (
                             <Badge variant="outline" className="border-amber-600/30 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 text-[10px] gap-1 shrink-0">
                                 <Scale className="h-3 w-3" /> مصر
+                            </Badge>
+                        ) : isCrsd ? (
+                            <Badge variant="outline" className={`text-[10px] gap-1 shrink-0 ${
+                                isCrsdAppeals
+                                    ? "border-indigo-500/30 text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30"
+                                    : "border-teal-500/30 text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30"
+                            }`}>
+                                <Gavel className="h-3 w-3" /> {isCrsdAppeals ? "لجنة الاستئناف" : "لجنة الفصل"}
                             </Badge>
                         ) : isBog ? (
                             <Badge variant="outline" className="border-emerald-600/30 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-[10px] gap-1 shrink-0">
@@ -717,19 +752,68 @@ export default function JudgmentDetail() {
                         )}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        {chips.map((chip, i) => (
-                            <div key={i} className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-full px-3 py-1">
-                                <chip.icon className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-muted-foreground">{chip.label}:</span>
-                                <span className="font-medium">{chip.value}</span>
+                    {/* CRSD structured metadata */}
+                    {isCrsd ? (
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                                {judgment.judgmentNumber && (
+                                    <div className={`flex items-center gap-1.5 text-sm font-bold rounded-lg px-3 py-1.5 ${
+                                        isCrsdAppeals
+                                            ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400"
+                                            : "bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-400"
+                                    }`}>
+                                        <Hash className="h-3.5 w-3.5" />
+                                        قرار رقم {judgment.judgmentNumber}
+                                    </div>
+                                )}
+                                {judgment.circuitType && judgment.circuitType !== "غير محدد" && (
+                                    <div className={`flex items-center gap-1 text-xs rounded-lg px-2.5 py-1.5 border ${
+                                        judgment.circuitType === "جزائي"
+                                            ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-400"
+                                            : judgment.circuitType === "إداري"
+                                            ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                            : "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-400"
+                                    }`}>
+                                        {judgment.circuitType}
+                                    </div>
+                                )}
                             </div>
-                        ))}
-                        <div className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-full px-3 py-1">
-                            <BookOpen className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-muted-foreground">{wordCount.toLocaleString("ar-SA")} كلمة</span>
+                            <div className="flex flex-wrap gap-2">
+                                {judgment.judgmentDate && (
+                                    <div className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-full px-3 py-1">
+                                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                                        <span className="text-muted-foreground">تاريخ القرار:</span>
+                                        <span className="font-medium">{fixArabicDate(judgment.judgmentDate)}</span>
+                                    </div>
+                                )}
+                                {judgment.yearHijri && (
+                                    <div className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-full px-3 py-1">
+                                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                                        <span className="text-muted-foreground">السنة:</span>
+                                        <span className="font-medium">{judgment.yearHijri}هـ</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-full px-3 py-1">
+                                    <BookOpen className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-muted-foreground">{wordCount.toLocaleString("ar-SA")} كلمة</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {chips.map((chip, i) => (
+                                <div key={i} className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-full px-3 py-1">
+                                    <chip.icon className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-muted-foreground">{chip.label}:</span>
+                                    <span className="font-medium">{chip.value}</span>
+                                </div>
+                            ))}
+                            <div className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-full px-3 py-1">
+                                <BookOpen className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-muted-foreground">{wordCount.toLocaleString("ar-SA")} كلمة</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Saudi MOJ Case Info Panel */}
@@ -750,6 +834,114 @@ export default function JudgmentDetail() {
                     </div>
                 )}
 
+                {/* CRSD Decision Metadata Panel - structured per committee */}
+                {crsdMeta && (
+                    <div className="rounded-2xl bg-background border shadow-sm p-5 mb-5 space-y-4">
+                        {/* Result Type Banner */}
+                        {crsdMeta.resultType && (
+                            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold ${
+                                crsdMeta.resultLabel === "تأييد"
+                                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
+                                    : crsdMeta.resultLabel === "تعديل"
+                                    ? "bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800"
+                                    : crsdMeta.resultLabel === "إلغاء" || crsdMeta.resultLabel === "نقض"
+                                    ? "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800"
+                                    : "bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                            }`}>
+                                <Gavel className="h-4 w-4 shrink-0" />
+                                {crsdMeta.resultType}
+                            </div>
+                        )}
+
+                        {/* رقم القضية - always on top */}
+                        {crsdMeta.caseNumber && (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border text-sm">
+                                <span className="text-muted-foreground">رقم القضية لدى لجنة الفصل:</span>
+                                <span className="font-bold text-foreground">{crsdMeta.caseNumber}</span>
+                            </div>
+                        )}
+
+                        {/* Two-column layout: لجنة الفصل + لجنة الاستئناف */}
+                        <div className={`grid gap-3 ${!crsdMeta.isFinal ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                            {/* بيانات قرار لجنة الفصل */}
+                            {(crsdMeta.fasal.decisionNumber || crsdMeta.fasal.decisionDate) && (
+                                <div className="rounded-xl border border-teal-200 dark:border-teal-800 overflow-hidden">
+                                    <div className="bg-teal-50 dark:bg-teal-950/40 px-3 py-2 text-xs font-bold text-teal-700 dark:text-teal-400 flex items-center gap-1.5">
+                                        <Scale className="h-3 w-3" />
+                                        قرار لجنة الفصل
+                                    </div>
+                                    <div className="p-3 space-y-1.5">
+                                        {crsdMeta.fasal.decisionNumber && (
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[11px] text-muted-foreground whitespace-nowrap mt-0.5">رقم القرار:</span>
+                                                <span className="text-sm font-medium text-foreground">{crsdMeta.fasal.decisionNumber}</span>
+                                            </div>
+                                        )}
+                                        {crsdMeta.fasal.decisionDate && (
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[11px] text-muted-foreground whitespace-nowrap mt-0.5">تاريخ القرار:</span>
+                                                <span className="text-sm font-medium text-foreground">{fixArabicDate(crsdMeta.fasal.decisionDate)}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* بيانات قرار لجنة الاستئناف */}
+                            {!crsdMeta.isFinal && (crsdMeta.appeal.decisionNumber || crsdMeta.appeal.decisionDate) && (
+                                <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 overflow-hidden">
+                                    <div className="bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 text-xs font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+                                        <Scale className="h-3 w-3" />
+                                        قرار لجنة الاستئناف
+                                    </div>
+                                    <div className="p-3 space-y-1.5">
+                                        {crsdMeta.appeal.decisionNumber && (
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[11px] text-muted-foreground whitespace-nowrap mt-0.5">رقم القرار:</span>
+                                                <span className="text-sm font-medium text-foreground">{crsdMeta.appeal.decisionNumber}</span>
+                                            </div>
+                                        )}
+                                        {crsdMeta.appeal.decisionDate && (
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[11px] text-muted-foreground whitespace-nowrap mt-0.5">تاريخ القرار:</span>
+                                                <span className="text-sm font-medium text-foreground">{fixArabicDate(crsdMeta.appeal.decisionDate)}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Bottom row: نوع الدعوى + التصنيف + سبب النهائية */}
+                        <div className="flex flex-wrap gap-2">
+                            {crsdMeta.caseType && (
+                                <div className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border ${
+                                    /جزائي/.test(crsdMeta.caseType)
+                                        ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-400"
+                                        : /إداري/.test(crsdMeta.caseType)
+                                        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                        : "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-400"
+                                }`}>
+                                    <span className="text-muted-foreground">نوع الدعوى:</span>
+                                    <span className="font-bold">{crsdMeta.caseType}</span>
+                                </div>
+                            )}
+                            {crsdMeta.subjectClass && (
+                                <div className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-400">
+                                    <span className="text-muted-foreground">التصنيف:</span>
+                                    <span className="font-bold">{crsdMeta.subjectClass}</span>
+                                </div>
+                            )}
+                            {crsdMeta.finalityReason && (
+                                <div className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-400">
+                                    <span className="text-muted-foreground">سبب النهائية:</span>
+                                    <span className="font-bold">{crsdMeta.finalityReason}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* BOG Metadata Panel */}
                 {bogMeta && (bogMeta.caseInfo.length > 0 || bogMeta.principles.length > 0 || bogMeta.legalBasis.length > 0) && (
                     <BogMetadataPanel meta={bogMeta} />
@@ -760,7 +952,7 @@ export default function JudgmentDetail() {
                 {/* Judgment Text */}
                 <div className="rounded-2xl bg-background border shadow-sm p-6 sm:p-8">
                     <JudgmentTextBody
-                        text={bogMeta?.bodyText || (saudiCaseInfo ? stripSaudiHeader(judgment.text) : judgment.text)}
+                        text={bogMeta?.bodyText || (saudiCaseInfo ? stripSaudiHeader(judgment.text) : (crsdMeta ? crsdMeta.bodyText : judgment.text))}
                         searchTerm={searchTerm}
                     />
                 </div>
