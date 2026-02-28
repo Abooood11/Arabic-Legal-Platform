@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { registerAuthRoutes, isAuthenticated, isAdmin, setupAuthSchema } from "./authSystem";
 import { db, sqlite } from "./db";
-import { articleOverrides, errorReports, judgments, gazetteIndex, crsdPrinciples } from "@shared/schema";
+import { articleOverrides, errorReports, judgments, gazetteIndex, crsdPrinciples, crsdDecisions } from "@shared/schema";
 import { eq, and, desc, sql, like } from "drizzle-orm";
 import { readLatestLegalMonitoringReport, runLegalMonitoringScan } from "./legalMonitoring";
 import { setupAnalyticsSchema, recordAnalyticsEvent } from "./analytics";
@@ -71,12 +71,8 @@ const saudiGazetteCategoryCaseSql = (alias: string) => `
 function buildGazetteIssuePdfUrl(issueNumber?: string | null): string | null {
   const normalized = String(issueNumber || "").trim();
   if (!normalized) return null;
-
-  const template =
-    process.env.UQN_ISSUE_PDF_URL_TEMPLATE ||
-    "https://www.uqn.gov.sa/IssuePdf?issueNumber={issueNumber}";
-
-  return template.replace("{issueNumber}", encodeURIComponent(normalized));
+  // Link directly to NCAR (المركز الوطني للوثائق والمحفوظات) Umm Al-Qura page
+  return `https://ncar.gov.sa/um-elqura?issue=${encodeURIComponent(normalized)}`;
 }
 
 export async function registerRoutes(
@@ -94,6 +90,7 @@ export async function registerRoutes(
   app.use("/api/laws", normalizeArabic);
   app.use("/api/judgments", normalizeArabic);
   app.use("/api/gazette", normalizeArabic);
+  app.use("/api/decisions", normalizeArabic);
   app.use("/api/search", normalizeArabic);
 
 
@@ -715,6 +712,32 @@ export async function registerRoutes(
     // Table may not exist yet
   }
 
+  // CRSD Decisions (أحكام لجان منازعات الأوراق المالية) search statements
+  let searchCrsdDecisionsStmt: any = null;
+  let countCrsdDecisionsStmt: any = null;
+  try {
+    searchCrsdDecisionsStmt = sqlite.prepare(`
+      SELECT d.id, d.decision_number, d.committee, d.committee_ar,
+             d.case_type, d.case_type_ar, d.decision_date, d.year_hijri,
+             d.pdf_url, d.page_count, d.auto_pass, d.needs_review,
+             snippet(crsd_decisions_fts, 0, '【', '】', '...', 40) as textSnippet,
+             bm25(crsd_decisions_fts) as rank
+      FROM crsd_decisions d
+      INNER JOIN crsd_decisions_fts fts ON d.id = fts.rowid
+      WHERE crsd_decisions_fts MATCH ?
+      ORDER BY rank
+      LIMIT ? OFFSET ?
+    `);
+    countCrsdDecisionsStmt = sqlite.prepare(`
+      SELECT count(*) as count
+      FROM crsd_decisions d
+      INNER JOIN crsd_decisions_fts fts ON d.id = fts.rowid
+      WHERE crsd_decisions_fts MATCH ?
+    `);
+  } catch {
+    // Table may not exist yet
+  }
+
   app.get("/api/search", async (req, res) => {
     try {
       const startTime = Date.now();
@@ -733,7 +756,7 @@ export async function registerRoutes(
           totalResults: 0,
           timeTaken: 0,
           intent: null,
-          results: { laws: { items: [], total: 0 }, judgments: { items: [], total: 0 }, gazette: { items: [], total: 0 }, tameems: { items: [], total: 0 }, principles: { items: [], total: 0 } }
+          results: { laws: { items: [], total: 0 }, judgments: { items: [], total: 0 }, gazette: { items: [], total: 0 }, tameems: { items: [], total: 0 }, principles: { items: [], total: 0 }, decisions: { items: [], total: 0 } }
         });
       }
 
@@ -799,16 +822,24 @@ export async function registerRoutes(
         catch { return { items: [], total: 0 }; }
       };
 
+      const searchDecisions = () => {
+        if (type !== "all" && type !== "decisions") return { items: [], total: 0 };
+        if (!searchCrsdDecisionsStmt) return { items: [], total: 0 };
+        try { return searchWithEstimate(searchCrsdDecisionsStmt, ftsQuery, limit, offset); }
+        catch { return { items: [], total: 0 }; }
+      };
+
       // Execute all searches (SQLite is sync so they run sequentially, but each is fast with FTS5)
       const lawResults = searchLaws();
       const judgmentResults = searchJudgments();
       const gazetteResults = searchGazette();
       const tameemsResults = searchTameems();
       const principlesResults = searchPrinciples();
+      const decisionsResults = searchDecisions();
 
       const timeTaken = Date.now() - startTime;
       // total = -1 means "more than current page" (exact count skipped for performance)
-      const allTotals = [lawResults.total, judgmentResults.total, gazetteResults.total, tameemsResults.total, principlesResults.total];
+      const allTotals = [lawResults.total, judgmentResults.total, gazetteResults.total, tameemsResults.total, principlesResults.total, decisionsResults.total];
       const hasUnknown = allTotals.some(t => t === -1);
       const totalResults = hasUnknown ? -1 : allTotals.reduce((a, b) => a + b, 0);
 
@@ -901,9 +932,16 @@ export async function registerRoutes(
         results: {
           laws: lawResults,
           judgments: judgmentResults,
-          gazette: gazetteResults,
+          gazette: {
+            ...gazetteResults,
+            items: gazetteResults.items.map((item: any) => ({
+              ...item,
+              issuePdfUrl: buildGazetteIssuePdfUrl(item.issue_number),
+            })),
+          },
           tameems: tameemsResults,
           principles: principlesResults,
+          decisions: decisionsResults,
         }
       });
     } catch (err: any) {
@@ -955,7 +993,13 @@ export async function registerRoutes(
       }
 
       res.set("Cache-Control", "public, max-age=300");
-      res.json({ judgments: relatedJudgments, gazette: relatedGazette });
+      res.json({
+        judgments: relatedJudgments,
+        gazette: relatedGazette.map((item: any) => ({
+          ...item,
+          issuePdfUrl: buildGazetteIssuePdfUrl(item.issue_number),
+        })),
+      });
     } catch (err: any) {
       res.json({ judgments: [], gazette: [] });
     }
@@ -1273,6 +1317,10 @@ export async function registerRoutes(
 
       const { q, city, year, court, hasDate, source, judge, exact } = req.query;
 
+      // Include CRSD decisions (لجان منازعات الأوراق المالية) only under Saudi tab
+      // Exclude when city or judge filter is active (CRSD has no geographic/judge data)
+      const includeCrsd = source === "sa_all" && !city && !judge;
+
       // Use FTS5 for text search when q is provided
       if (q && typeof q === "string" && q.trim().length > 0) {
         try {
@@ -1301,6 +1349,67 @@ export async function registerRoutes(
             ? buildLiteralFtsQuery(q)
             : buildLegalFtsQuery(q) || q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
 
+          // Include CRSD decisions via UNION ALL when applicable
+          if (includeCrsd) {
+            const crsdFilters: string[] = [];
+            const crsdParams: any[] = [];
+            if (year) { crsdFilters.push("d.year_hijri = ?"); crsdParams.push(parseInt(year as string)); }
+            if (court) { crsdFilters.push("d.committee_ar LIKE ?"); crsdParams.push(`%${court}%`); }
+            if (hasDate === "true") { crsdFilters.push("d.decision_date IS NOT NULL AND d.decision_date != ''"); }
+            const crsdFilterSQL = crsdFilters.length > 0 ? " AND " + crsdFilters.join(" AND ") : "";
+
+            const countResult = sqlite.prepare(`
+              SELECT (
+                SELECT count(*) FROM judgments j
+                INNER JOIN judgments_fts fts ON j.id = fts.rowid
+                WHERE judgments_fts MATCH ? ${filterSQL}
+              ) + (
+                SELECT count(*) FROM crsd_decisions d
+                INNER JOIN crsd_decisions_fts cfts ON d.id = cfts.rowid
+                WHERE crsd_decisions_fts MATCH ?${crsdFilterSQL}
+              ) as count
+            `).get(ftsQuery, ...params, ftsQuery, ...crsdParams) as any;
+
+            const results = sqlite.prepare(`
+              SELECT * FROM (
+                SELECT j.id, j.case_id as caseId, j.year_hijri as yearHijri, j.city,
+                       j.court_body as courtBody, j.circuit_type as circuitType,
+                       j.judgment_number as judgmentNumber, j.judgment_date as judgmentDate,
+                       j.source, j.appeal_type as appealType,
+                       snippet(judgments_fts, 0, '【', '】', '...', 40) as textSnippet,
+                       bm25(judgments_fts) as rank
+                FROM judgments j
+                INNER JOIN judgments_fts fts ON j.id = fts.rowid
+                WHERE judgments_fts MATCH ? ${filterSQL}
+                UNION ALL
+                SELECT d.id + 10000000 as id, 'crsd-' || d.id as caseId, d.year_hijri as yearHijri,
+                       '' as city, d.committee_ar as courtBody,
+                       COALESCE(d.case_type_ar, '') as circuitType,
+                       CAST(d.decision_number AS TEXT) as judgmentNumber,
+                       d.decision_date as judgmentDate,
+                       'crsd' as source, NULL as appealType,
+                       snippet(crsd_decisions_fts, 0, '【', '】', '...', 40) as textSnippet,
+                       bm25(crsd_decisions_fts) as rank
+                FROM crsd_decisions d
+                INNER JOIN crsd_decisions_fts cfts ON d.id = cfts.rowid
+                WHERE crsd_decisions_fts MATCH ?${crsdFilterSQL}
+              ) combined
+              ORDER BY rank
+              LIMIT ? OFFSET ?
+            `).all(ftsQuery, ...params, ftsQuery, ...crsdParams, limit, offset);
+
+            return res.json({
+              data: results,
+              pagination: {
+                page,
+                limit,
+                total: Number(countResult.count),
+                totalPages: Math.ceil(Number(countResult.count) / limit),
+              },
+            });
+          }
+
+          // Standard FTS query (specific source or city/judge filter active)
           const countStmt = sqlite.prepare(`
             SELECT count(*) as count FROM judgments j
             INNER JOIN judgments_fts fts ON j.id = fts.rowid
@@ -1321,10 +1430,7 @@ export async function registerRoutes(
             ORDER BY rank
             LIMIT ? OFFSET ?
           `);
-          const results = (dataStmt.all(ftsQuery, ...params, limit, offset) as any[]).map((item) => ({
-            ...item,
-            issuePdfUrl: buildGazetteIssuePdfUrl(item.issueNumber),
-          }));
+          const results = dataStmt.all(ftsQuery, ...params, limit, offset);
 
           return res.json({
             data: results,
@@ -1342,6 +1448,62 @@ export async function registerRoutes(
       }
 
       // Non-FTS path (no search query or FTS fallback)
+      // Include CRSD decisions via UNION ALL when applicable
+      if (includeCrsd) {
+        const jConds: string[] = [];
+        const jParams: any[] = [];
+        if (source === "sa_all") jConds.push("source IN ('sa_judicial', 'bog_judicial', 'moj_research')");
+        if (year) { jConds.push("year_hijri = ?"); jParams.push(parseInt(year as string)); }
+        if (court) { jConds.push("court_body LIKE ?"); jParams.push(`%${court}%`); }
+        if (q) { jConds.push("text LIKE ?"); jParams.push(`%${q}%`); }
+        if (hasDate === "true") jConds.push("judgment_date IS NOT NULL AND judgment_date != ''");
+        const jWhere = jConds.length > 0 ? "WHERE " + jConds.join(" AND ") : "";
+
+        const cConds: string[] = [];
+        const cParams: any[] = [];
+        if (year) { cConds.push("year_hijri = ?"); cParams.push(parseInt(year as string)); }
+        if (court) { cConds.push("committee_ar LIKE ?"); cParams.push(`%${court}%`); }
+        if (q) { cConds.push("full_text LIKE ?"); cParams.push(`%${q}%`); }
+        if (hasDate === "true") cConds.push("decision_date IS NOT NULL AND decision_date != ''");
+        const cWhere = cConds.length > 0 ? "WHERE " + cConds.join(" AND ") : "";
+
+        let unionOrder = "ORDER BY judgmentDate DESC";
+        if (sort === "year") unionOrder = "ORDER BY yearHijri DESC";
+        else if (sort === "city") unionOrder = "ORDER BY city";
+        else if (sort === "court") unionOrder = "ORDER BY courtBody";
+
+        const jCount = (sqlite.prepare(`SELECT count(*) as c FROM judgments ${jWhere}`).get(...jParams) as any)?.c || 0;
+        const cCount = (sqlite.prepare(`SELECT count(*) as c FROM crsd_decisions ${cWhere}`).get(...cParams) as any)?.c || 0;
+        const total = jCount + cCount;
+
+        const results = sqlite.prepare(`
+          SELECT * FROM (
+            SELECT id, case_id as caseId, year_hijri as yearHijri, city,
+                   court_body as courtBody, circuit_type as circuitType,
+                   judgment_number as judgmentNumber, judgment_date as judgmentDate,
+                   source, appeal_type as appealType,
+                   substr(text, 1, 400) as textSnippet
+            FROM judgments ${jWhere}
+            UNION ALL
+            SELECT id + 10000000 as id, 'crsd-' || id as caseId, year_hijri as yearHijri,
+                   '' as city, committee_ar as courtBody,
+                   COALESCE(case_type_ar, '') as circuitType,
+                   CAST(decision_number AS TEXT) as judgmentNumber,
+                   decision_date as judgmentDate,
+                   'crsd' as source, NULL as appealType,
+                   substr(full_text, 1, 400) as textSnippet
+            FROM crsd_decisions ${cWhere}
+          ) combined
+          ${unionOrder}
+          LIMIT ? OFFSET ?
+        `).all(...jParams, ...cParams, limit, offset);
+
+        return res.json({
+          data: results,
+          pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+      }
+
       const conditions = [];
 
       if (city) {
@@ -1446,16 +1608,38 @@ export async function registerRoutes(
   function warmFacetsCache(sourceKey: string) {
     const srcFilter = sourceKey === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial', 'moj_research')" : sourceKey ? " AND source = ?" : "";
     const srcParam = sourceKey === "sa_all" ? [] : sourceKey ? [sourceKey] : [];
+    const includeCrsdFacets = sourceKey === "sa_all";
     try {
       const cities = sqlite.prepare(
         `SELECT city, count(*) as count FROM judgments WHERE city IS NOT NULL AND city != ''${srcFilter} GROUP BY city ORDER BY count DESC LIMIT 50`
       ).all(...srcParam);
-      const courts = sqlite.prepare(
+      let courts = sqlite.prepare(
         `SELECT court_body as court, count(*) as count FROM judgments WHERE court_body IS NOT NULL AND court_body != ''${srcFilter} GROUP BY court_body ORDER BY count DESC LIMIT 50`
-      ).all(...srcParam);
-      const years = sqlite.prepare(
+      ).all(...srcParam) as any[];
+      let years = sqlite.prepare(
         `SELECT year_hijri as year, count(*) as count FROM judgments WHERE year_hijri IS NOT NULL${srcFilter} GROUP BY year_hijri ORDER BY year_hijri DESC`
-      ).all(...srcParam);
+      ).all(...srcParam) as any[];
+
+      // Include CRSD committee names in courts and CRSD years
+      if (includeCrsdFacets) {
+        try {
+          const crsdCommittees = sqlite.prepare(
+            `SELECT committee_ar as court, count(*) as count FROM crsd_decisions WHERE committee_ar IS NOT NULL AND committee_ar != '' GROUP BY committee_ar ORDER BY count DESC`
+          ).all() as any[];
+          courts = [...courts, ...crsdCommittees].sort((a: any, b: any) => b.count - a.count);
+
+          const crsdYears = sqlite.prepare(
+            `SELECT year_hijri as year, count(*) as count FROM crsd_decisions WHERE year_hijri IS NOT NULL GROUP BY year_hijri ORDER BY year_hijri DESC`
+          ).all() as any[];
+          const yearMap = new Map<number, number>();
+          for (const y of years) yearMap.set(y.year, (yearMap.get(y.year) || 0) + y.count);
+          for (const y of crsdYears) yearMap.set(y.year, (yearMap.get(y.year) || 0) + y.count);
+          years = Array.from(yearMap.entries()).map(([year, count]) => ({ year, count })).sort((a, b) => b.year - a.year);
+        } catch (crsdErr: any) {
+          console.warn("CRSD facets merge skipped:", crsdErr.message);
+        }
+      }
+
       const result = { cities, courts, years };
       facetsCache.set(`facets-${sourceKey || "all"}`, { data: result, ts: Date.now() });
       console.log(`Facets cache warmed for ${sourceKey || "all"}`);
@@ -1482,16 +1666,37 @@ export async function registerRoutes(
       // If not cached yet, compute now
       const srcFilter = source === "sa_all" ? " AND source IN ('sa_judicial', 'bog_judicial', 'moj_research')" : source ? " AND source = ?" : "";
       const srcParam = source === "sa_all" ? [] : source ? [source] : [];
+      const includeCrsdFacets = source === "sa_all";
 
       const cities = sqlite.prepare(
         `SELECT city, count(*) as count FROM judgments WHERE city IS NOT NULL AND city != ''${srcFilter} GROUP BY city ORDER BY count DESC LIMIT 50`
       ).all(...srcParam);
-      const courts = sqlite.prepare(
+      let courts = sqlite.prepare(
         `SELECT court_body as court, count(*) as count FROM judgments WHERE court_body IS NOT NULL AND court_body != ''${srcFilter} GROUP BY court_body ORDER BY count DESC LIMIT 50`
-      ).all(...srcParam);
-      const years = sqlite.prepare(
+      ).all(...srcParam) as any[];
+      let years = sqlite.prepare(
         `SELECT year_hijri as year, count(*) as count FROM judgments WHERE year_hijri IS NOT NULL${srcFilter} GROUP BY year_hijri ORDER BY year_hijri DESC`
-      ).all(...srcParam);
+      ).all(...srcParam) as any[];
+
+      // Include CRSD committee names in courts and years
+      if (includeCrsdFacets) {
+        try {
+          const crsdCommittees = sqlite.prepare(
+            `SELECT committee_ar as court, count(*) as count FROM crsd_decisions WHERE committee_ar IS NOT NULL AND committee_ar != '' GROUP BY committee_ar ORDER BY count DESC`
+          ).all() as any[];
+          courts = [...courts, ...crsdCommittees].sort((a: any, b: any) => b.count - a.count);
+
+          const crsdYears = sqlite.prepare(
+            `SELECT year_hijri as year, count(*) as count FROM crsd_decisions WHERE year_hijri IS NOT NULL GROUP BY year_hijri ORDER BY year_hijri DESC`
+          ).all() as any[];
+          const yearMap = new Map<number, number>();
+          for (const y of years) yearMap.set(y.year, (yearMap.get(y.year) || 0) + y.count);
+          for (const y of crsdYears) yearMap.set(y.year, (yearMap.get(y.year) || 0) + y.count);
+          years = Array.from(yearMap.entries()).map(([year, count]) => ({ year, count })).sort((a, b) => b.year - a.year);
+        } catch (crsdErr: any) {
+          console.warn("CRSD facets merge skipped:", crsdErr.message);
+        }
+      }
 
       const result = { cities, courts, years };
       facetsCache.set(cacheKey, { data: result, ts: Date.now() });
@@ -1512,6 +1717,42 @@ export async function registerRoutes(
       if (isNaN(id)) {
         console.error(`Invalid judgment ID requested: "${idParam}"`);
         return res.status(400).json({ message: "Invalid judgment ID" });
+      }
+
+      // CRSD decisions (لجان منازعات الأوراق المالية) use offset IDs >= 10000000
+      if (id >= 10000000) {
+        const crsdId = id - 10000000;
+        const crsdResult = sqlite.prepare(`
+          SELECT id, decision_number, committee, committee_ar,
+                 case_type, case_type_ar, decision_date, decision_date_raw,
+                 year_hijri, full_text, page_count, pdf_url, pdf_sha256,
+                 ocr_confidence, auto_pass, needs_review, quality_json, created_at
+          FROM crsd_decisions WHERE id = ?
+        `).get(crsdId) as any;
+
+        if (!crsdResult) {
+          return res.status(404).json({ message: "Decision not found", requestedId: id });
+        }
+
+        // Map CRSD decision fields to judgment-compatible shape
+        return res.json({
+          id: id,
+          caseId: `crsd-${crsdResult.id}`,
+          yearHijri: crsdResult.year_hijri,
+          city: "",
+          courtBody: crsdResult.committee_ar,
+          circuitType: crsdResult.case_type_ar || "",
+          judgmentNumber: crsdResult.decision_number ? String(crsdResult.decision_number) : "",
+          judgmentDate: crsdResult.decision_date || "",
+          text: crsdResult.full_text || "",
+          source: "crsd",
+          pdfUrl: crsdResult.pdf_url,
+          pageCount: crsdResult.page_count,
+          committee: crsdResult.committee,
+          committeeAr: crsdResult.committee_ar,
+          caseType: crsdResult.case_type,
+          caseTypeAr: crsdResult.case_type_ar,
+        });
       }
 
       const [result] = await db
@@ -1907,7 +2148,10 @@ export async function registerRoutes(
           const results = dataStmt.all(ftsQuery, ...params, limit, offset);
 
           return res.json({
-            data: results,
+            data: (results as any[]).map((item) => ({
+              ...item,
+              issuePdfUrl: buildGazetteIssuePdfUrl(item.issueNumber),
+            })),
             pagination: {
               page, limit,
               total: Number(countResult.count),
@@ -2105,6 +2349,228 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching principle:", error);
       res.status(500).json({ message: "Failed to fetch principle" });
+    }
+  });
+
+  // ============================================
+  // CRSD Decisions (أحكام لجان منازعات الأوراق المالية) API
+  // ============================================
+
+  // Cache for decisions facets
+  const decisionsFacetsCache = new Map<string, { data: any; ts: number }>();
+  const DECISIONS_FACETS_TTL = 3600_000; // 1 hour
+
+  // List / Search decisions
+  app.get("/api/decisions", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const offset = (page - 1) * limit;
+      const sort = (req.query.sort as string) || "number";
+
+      const q = (req.query.q as string || "").trim();
+      const committee = req.query.committee as string;
+      const caseType = req.query.case_type as string;
+      const year = req.query.year as string;
+      const exact = req.query.exact as string;
+      const reviewStatus = req.query.review as string; // "auto_pass", "needs_review", or omit for all
+
+      // FTS search path
+      if (q.length >= 2 && searchCrsdDecisionsStmt) {
+        try {
+          const ftsQuery = exact === "true"
+            ? buildLiteralFtsQuery(q)
+            : buildLegalFtsQuery(q) || q.trim().split(/\s+/).map((w: string) => `${w}*`).join(" ");
+
+          // Build additional WHERE filters
+          const filters: string[] = [];
+          const params: any[] = [];
+
+          if (committee) { filters.push("d.committee = ?"); params.push(committee); }
+          if (caseType) { filters.push("d.case_type = ?"); params.push(caseType); }
+          if (year) { filters.push("d.year_hijri = ?"); params.push(parseInt(year)); }
+          if (reviewStatus === "auto_pass") { filters.push("d.auto_pass = 1"); }
+          else if (reviewStatus === "needs_review") { filters.push("d.needs_review = 1"); }
+          // Default: show all decisions (single OCR mode)
+
+          const filterSQL = filters.length > 0 ? " AND " + filters.join(" AND ") : "";
+
+          const countResult = sqlite.prepare(`
+            SELECT count(*) as count
+            FROM crsd_decisions d
+            INNER JOIN crsd_decisions_fts fts ON d.id = fts.rowid
+            WHERE crsd_decisions_fts MATCH ?${filterSQL}
+          `).get(ftsQuery, ...params) as any;
+
+          const items = sqlite.prepare(`
+            SELECT d.id, d.decision_number, d.committee, d.committee_ar,
+                   d.case_type, d.case_type_ar, d.decision_date, d.year_hijri,
+                   d.pdf_url, d.page_count, d.auto_pass, d.needs_review,
+                   snippet(crsd_decisions_fts, 0, '【', '】', '...', 50) as textSnippet,
+                   bm25(crsd_decisions_fts) as rank
+            FROM crsd_decisions d
+            INNER JOIN crsd_decisions_fts fts ON d.id = fts.rowid
+            WHERE crsd_decisions_fts MATCH ?${filterSQL}
+            ORDER BY rank
+            LIMIT ? OFFSET ?
+          `).all(ftsQuery, ...params, limit, offset) as any[];
+
+          // Committee facets for this query
+          const committeeFacets = sqlite.prepare(`
+            SELECT d.committee, d.committee_ar, count(*) as count
+            FROM crsd_decisions d
+            INNER JOIN crsd_decisions_fts fts ON d.id = fts.rowid
+            WHERE crsd_decisions_fts MATCH ? AND d.auto_pass = 1
+            GROUP BY d.committee
+            ORDER BY count DESC
+          `).all(ftsQuery) as any[];
+
+          res.set("Cache-Control", "public, max-age=300");
+          return res.json({
+            data: items,
+            pagination: {
+              page,
+              limit,
+              total: Number(countResult.count),
+              totalPages: Math.ceil(Number(countResult.count) / limit),
+            },
+            facets: { committees: committeeFacets },
+          });
+        } catch (ftsErr) {
+          console.warn("CRSD Decisions FTS search failed, falling back to LIKE:", ftsErr);
+        }
+      }
+
+      // Non-FTS path (browse / filter)
+      const conditions: string[] = [];
+      const params: any[] = [];
+
+      if (committee) { conditions.push("committee = ?"); params.push(committee); }
+      if (caseType) { conditions.push("case_type = ?"); params.push(caseType); }
+      if (year) { conditions.push("year_hijri = ?"); params.push(parseInt(year)); }
+      if (q) { conditions.push("full_text LIKE ?"); params.push(`%${q}%`); }
+
+      // Filter by review status if specified
+      if (reviewStatus === "needs_review") { conditions.push("needs_review = 1"); }
+      else if (reviewStatus === "auto_pass") { conditions.push("auto_pass = 1"); }
+      // Default: show all decisions
+
+      const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
+      // Sort
+      let orderSQL = "ORDER BY decision_number DESC";
+      if (sort === "date") orderSQL = "ORDER BY decision_date DESC";
+      else if (sort === "year") orderSQL = "ORDER BY year_hijri DESC";
+      else if (sort === "committee") orderSQL = "ORDER BY committee, decision_number DESC";
+
+      const total = (sqlite.prepare(`SELECT count(*) as c FROM crsd_decisions ${where}`).get(...params) as any)?.c || 0;
+      const items = sqlite.prepare(`
+        SELECT id, decision_number, committee, committee_ar,
+               case_type, case_type_ar, decision_date, year_hijri,
+               pdf_url, page_count, auto_pass, needs_review,
+               substr(full_text, 1, 400) as textSnippet
+        FROM crsd_decisions ${where}
+        ${orderSQL}
+        LIMIT ? OFFSET ?
+      `).all(...params, limit, offset) as any[];
+
+      res.set("Cache-Control", "public, max-age=300");
+      res.json({
+        data: items,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching decisions:", error);
+      res.status(500).json({ message: "Failed to fetch decisions" });
+    }
+  });
+
+  // Decisions facets — MUST be before :id route
+  app.get("/api/decisions/facets", async (req, res) => {
+    try {
+      const cacheKey = "decisions-facets";
+      const cached = decisionsFacetsCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < DECISIONS_FACETS_TTL) {
+        res.set("Cache-Control", "public, max-age=600");
+        return res.json(cached.data);
+      }
+
+      const committees = sqlite.prepare(`
+        SELECT committee, committee_ar, count(*) as count
+        FROM crsd_decisions
+        GROUP BY committee
+        ORDER BY count DESC
+      `).all() as any[];
+
+      const caseTypes = sqlite.prepare(`
+        SELECT case_type, case_type_ar, count(*) as count
+        FROM crsd_decisions
+        WHERE case_type IS NOT NULL AND case_type != ''
+        GROUP BY case_type
+        ORDER BY count DESC
+      `).all() as any[];
+
+      const years = sqlite.prepare(`
+        SELECT year_hijri as year, count(*) as count
+        FROM crsd_decisions
+        WHERE year_hijri IS NOT NULL
+        GROUP BY year_hijri
+        ORDER BY year_hijri DESC
+      `).all() as any[];
+
+      const total = (sqlite.prepare("SELECT count(*) as cnt FROM crsd_decisions").get() as any)?.cnt || 0;
+      const totalAll = (sqlite.prepare("SELECT count(*) as cnt FROM crsd_decisions").get() as any)?.cnt || 0;
+      const totalReview = (sqlite.prepare("SELECT count(*) as cnt FROM crsd_decisions WHERE needs_review = 1").get() as any)?.cnt || 0;
+
+      const result = { committees, caseTypes, years, total, totalAll, totalReview };
+      decisionsFacetsCache.set(cacheKey, { data: result, ts: Date.now() });
+      res.set("Cache-Control", "public, max-age=600");
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching decisions facets:", error);
+      res.status(500).json({ message: "Failed to fetch decisions facets" });
+    }
+  });
+
+  // Single Decision by ID
+  app.get("/api/decisions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid decision ID" });
+      }
+
+      const result = sqlite.prepare(`
+        SELECT id, decision_number, committee, committee_ar,
+               case_type, case_type_ar, decision_date, decision_date_raw,
+               year_hijri, full_text, page_count, pdf_url, pdf_sha256,
+               ocr_confidence, auto_pass, needs_review, quality_json, created_at
+        FROM crsd_decisions WHERE id = ?
+      `).get(id) as any;
+
+      if (!result) {
+        return res.status(404).json({ message: "Decision not found" });
+      }
+
+      // Parse quality_json if present
+      if (result.quality_json) {
+        try {
+          result.quality = JSON.parse(result.quality_json);
+        } catch {
+          result.quality = null;
+        }
+        delete result.quality_json;
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching decision:", error);
+      res.status(500).json({ message: "Failed to fetch decision" });
     }
   });
 

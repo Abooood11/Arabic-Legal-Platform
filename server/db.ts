@@ -30,11 +30,11 @@ try {
         );
     `);
 
-    // Check if FTS table is populated
-    const ftsCount = sqlite.prepare("SELECT count(*) as cnt FROM judgments_fts").get() as any;
+    // Check if FTS table is populated (use LIMIT 1, NOT count(*) — FTS count on 568K rows takes 60s+)
+    const ftsHasRows = sqlite.prepare("SELECT 1 FROM judgments_fts LIMIT 1").get();
     const mainCount = sqlite.prepare("SELECT count(*) as cnt FROM judgments").get() as any;
 
-    if (ftsCount.cnt === 0 && mainCount.cnt > 0) {
+    if (!ftsHasRows && mainCount.cnt > 0) {
         console.log("Populating FTS index... this may take a moment");
         sqlite.exec(`INSERT INTO judgments_fts(rowid, text, court_body) SELECT id, text, court_body FROM judgments;`);
         console.log("FTS index populated.");
@@ -134,8 +134,8 @@ try {
         }
     } else {
         // Check if FTS is populated
-        const giFtsCount = sqlite.prepare("SELECT count(*) as cnt FROM gazette_fts").get() as any;
-        if (giFtsCount.cnt === 0 && giCount.cnt > 0) {
+        const giFtsHasRows = sqlite.prepare("SELECT 1 FROM gazette_fts LIMIT 1").get();
+        if (!giFtsHasRows && giCount.cnt > 0) {
             console.log("Populating gazette FTS index...");
             sqlite.exec(`INSERT INTO gazette_fts(rowid, title, category) SELECT id, title, category FROM gazette_index;`);
             console.log("Gazette FTS index populated.");
@@ -239,8 +239,8 @@ try {
         }
     } else {
         // Check if FTS is populated
-        const laFtsCount = sqlite.prepare("SELECT count(*) as cnt FROM law_articles_fts").get() as any;
-        if (laFtsCount.cnt === 0 && laCount.cnt > 0) {
+        const laFtsHasRows = sqlite.prepare("SELECT 1 FROM law_articles_fts LIMIT 1").get();
+        if (!laFtsHasRows && laCount.cnt > 0) {
             console.log("Populating law articles FTS index...");
             sqlite.exec(`
                 INSERT INTO law_articles_fts(rowid, law_id, law_name, article_number, article_text, article_heading)
@@ -363,9 +363,9 @@ try {
 
     // Check if FTS table is populated
     const crsdCount = sqlite.prepare("SELECT count(*) as cnt FROM crsd_principles").get() as any;
-    const crsdFtsCount = sqlite.prepare("SELECT count(*) as cnt FROM crsd_principles_fts").get() as any;
+    const crsdFtsHasRows = sqlite.prepare("SELECT 1 FROM crsd_principles_fts LIMIT 1").get();
 
-    if (crsdFtsCount.cnt === 0 && crsdCount.cnt > 0) {
+    if (!crsdFtsHasRows && crsdCount.cnt > 0) {
         console.log("Populating CRSD principles FTS index...");
         sqlite.exec(`INSERT INTO crsd_principles_fts(rowid, principle_text, section_ar) SELECT id, principle_text, section_ar FROM crsd_principles;`);
         console.log("CRSD principles FTS index populated.");
@@ -378,6 +378,62 @@ try {
     }
 } catch (e: any) {
     console.warn("CRSD principles setup:", e.message);
+}
+
+// ============================================
+// CRSD Decisions Table + FTS5
+// ============================================
+try {
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS crsd_decisions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            decision_number INTEGER NOT NULL,
+            committee TEXT NOT NULL,
+            committee_ar TEXT NOT NULL,
+            case_type TEXT,
+            case_type_ar TEXT,
+            decision_date TEXT,
+            decision_date_raw TEXT,
+            year_hijri INTEGER,
+            full_text TEXT NOT NULL,
+            full_text_raw TEXT,
+            page_count INTEGER,
+            pdf_url TEXT NOT NULL,
+            pdf_sha256 TEXT,
+            ocr_confidence REAL,
+            auto_pass INTEGER DEFAULT 0,
+            needs_review INTEGER DEFAULT 0,
+            quality_json TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+    `);
+
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_dec_number_idx ON crsd_decisions(decision_number);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_dec_committee_idx ON crsd_decisions(committee);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_dec_case_type_idx ON crsd_decisions(case_type);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_dec_year_idx ON crsd_decisions(year_hijri);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_dec_auto_pass_idx ON crsd_decisions(auto_pass);`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS crsd_dec_review_idx ON crsd_decisions(needs_review);`);
+
+    sqlite.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS crsd_decisions_fts USING fts5(
+            full_text,
+            committee_ar,
+            case_type_ar,
+            content='crsd_decisions',
+            content_rowid='id',
+            tokenize='unicode61 remove_diacritics 2'
+        );
+    `);
+
+    const crsdDecCount = sqlite.prepare("SELECT count(*) as cnt FROM crsd_decisions").get() as any;
+    if (crsdDecCount.cnt > 0) {
+        console.log(`CRSD decisions table ready: ${crsdDecCount.cnt} decisions.`);
+    } else {
+        console.log("CRSD decisions table ready (empty - run import script).");
+    }
+} catch (e: any) {
+    console.warn("CRSD decisions setup:", e.message);
 }
 
 // ============================================
