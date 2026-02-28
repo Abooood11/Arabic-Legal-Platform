@@ -363,8 +363,6 @@ export interface CrsdMetadata {
     isFinal: boolean;
     /** The body text starting from الوقائع */
     bodyText: string;
-    /** Text quality indicator: null = OK, otherwise describes the issue */
-    textQuality?: "empty_body" | "truncated" | "corrupted";
 }
 
 /**
@@ -497,22 +495,7 @@ function parseCrsdHeader(headerText: string, bodyText: string): CrsdMetadata {
         }
     }
 
-    // Detect text quality issues
-    let textQuality: CrsdMetadata["textQuality"];
-    const strippedBody = bodyText.replace(/^الوقائع\s*/m, '').replace(/^الأسباب\s*/m, '').trim();
-    if (strippedBody.length < 50) {
-        textQuality = "empty_body";
-    } else if (/[-ـ\s]{100,}$/.test(bodyText) || /^[-ـ\s]{500,}/m.test(bodyText)) {
-        textQuality = "corrupted";
-    } else if (strippedBody.length > 500 && !/[.،؛:。]\s*$/.test(strippedBody) && !/وسلم\.?\s*$/.test(strippedBody) && !/طلبات\.?\s*$/.test(strippedBody)) {
-        // Long text that doesn't end with proper punctuation/closing
-        const lastLine = strippedBody.split('\n').pop()?.trim() || '';
-        if (lastLine.length > 20 && !/[.،؛:\)）]$/.test(lastLine)) {
-            textQuality = "truncated";
-        }
-    }
-
-    return { resultType, resultLabel, caseNumber, fasal, appeal, caseType, subjectClass, finalityReason, isFinal, bodyText, textQuality };
+    return { resultType, resultLabel, caseNumber, fasal, appeal, caseType, subjectClass, finalityReason, isFinal, bodyText };
 }
 
 /** Peek at next line for a value (skipping label-like lines) */
